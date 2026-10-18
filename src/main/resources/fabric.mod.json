@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "novaclient",
+  "version": "${version}",
+  "name": "Nova Client",
+  "description": "Custom Minecraft client: main menu, accounts, skins, friends, freecam, with Sodium and Iris built in.",
+  "environment": "client",
+  "entrypoints": { "client": ["com.nova.client.NovaClient"] },
+  "mixins": ["novaclient.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.4",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
