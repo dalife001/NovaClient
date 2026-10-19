@@ -8,6 +8,32 @@ Nova/
   .github/        auto-release pipeline
 ```
 
+
+## What is new in v2 (Nova Aurora design)
+
+**Launcher**: rebuilt UI with a sidebar, a hero card (your skin on an animated night scene), profile rows with a big Play button, a status column, a Console page and a dark Settings window with a memory slider. Login / install / update logic is unchanged.
+
+**5 colour themes** (Nova, Ocean, Sunset, Emerald, Rose): click the palette button in the launcher sidebar. The choice is saved and passed to the game (`-Dnova.theme`), so the in-game menu, HUD panels and module list use the same colours. You can also change it in the game: Right Shift > Visual > Theme.
+
+![Themes](docs/launcher-themes.png)
+
+**New modules (Right Shift menu)**
+
+| Module | Tab | What it does |
+|---|---|---|
+| Fullbright | Visual | Max brightness everywhere. Restores your old brightness when off or on exit. |
+| Crosshair | Visual | Custom crosshair: size, gap, thickness, colour, centre dot. Replaces the vanilla one. |
+| Low Fire | Visual | Fire overlay no longer covers your view (adjustable). |
+| Theme | Visual | Palette 0-4 for the whole client. |
+| Speed | HUD | Blocks per second. |
+| Memory | HUD | RAM used / max. |
+| Combo | HUD | Hits in a row, resets when you get hit or after 3 s. |
+| Module List | HUD | Shows which features are on, with accent bars. |
+
+HUD panels (Potion Status, Armor Status, Coordinates) use titled glass panels. Shared look lives in `module/Hud.java` (`Hud.titled(...)`). New HUD modules are off by default so your layout does not change; turn them on in the menu and place them with the HUD editor.
+
+![Launcher](docs/launcher-home.png)
+
 ## One app: launcher + client together (Windows)
 1. Install the JDK once: `winget install EclipseAdoptium.Temurin.21.JDK` (then reopen the window).
 2. Double-click **build-everything.bat**. It builds the Nova Client mod and packs it INSIDE the launcher,

@@ -19,6 +19,8 @@ final class LauncherConfig {
     String backgroundPath = "";
     String javaPath = "";
     int ramMb = 4096;
+    /** Colour palette index (0 Nova, 1 Ocean, 2 Sunset, 3 Emerald, 4 Rose). Shared with the game. */
+    int theme = 0;
 
     static Path file() { return Platform.home().resolve("launcher.json"); }
 
@@ -37,6 +39,7 @@ final class LauncherConfig {
                 c.javaPath = s(m, "javaPath", c.javaPath);
                 long r = Json.num(m, "ramMb");
                 if (r >= 1024) c.ramMb = (int) r;
+                c.theme = (int) Math.max(0, Math.min(4, Json.num(m, "theme")));
             }
         } catch (Exception ignored) {}
         return c;
@@ -60,6 +63,7 @@ final class LauncherConfig {
             m.put("backgroundPath", backgroundPath);
             m.put("javaPath", javaPath);
             m.put("ramMb", (double) ramMb);
+            m.put("theme", (double) theme);
             Files.writeString(file(), Json.write(m));
         } catch (Exception e) {
             e.printStackTrace();

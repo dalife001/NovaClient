@@ -8,9 +8,9 @@ import java.util.Random;
 
 /** Shared colours and drawing helpers so every screen looks the same. */
 public final class Ui {
-    public static final int ACCENT = 0xFF8B5CF6;
-    public static final int ACCENT_DARK = 0xFF5B34B8;
-    public static final int CYAN = 0xFF22D3EE;
+    public static int ACCENT = 0xFF8B5CF6;
+    public static int ACCENT_DARK = 0xFF5B34B8;
+    public static int CYAN = 0xFF22D3EE;
     public static final int PANEL = 0xE0121226;
     public static final int PANEL_LIGHT = 0xE01C1C3A;
     public static final int TEXT = 0xFFFFFFFF;
@@ -60,7 +60,7 @@ public final class Ui {
         int x = 0;
         for (int i = 0; i < ws.length; i++) {
             float k = 0.5f + 0.5f * (float) Math.sin(t * 2.2f - i * 0.8f);
-            text(c, tr, String.valueOf(s.charAt(i)), x, 0, Anim.lerpColor(0xFFE9D5FF, 0xFF67E8F9, k), alpha);
+            text(c, tr, String.valueOf(s.charAt(i)), x, 0, Anim.lerpColor(Theme.light(ACCENT), Theme.light(CYAN), k), alpha);
             x += ws[i];
         }
         c.getMatrices().pop();
@@ -126,9 +126,9 @@ public final class Ui {
             double t = Anim.seconds();
             int base = Math.min(w, h);
             glow(c, (int) (w * 0.30 + Math.sin(t * 0.40) * w * 0.08 - dx * 40),
-                    (int) (h * 0.30 + Math.cos(t * 0.30) * h * 0.08 - dy * 30), (int) (base * 0.50), 0x8B5CF6);
+                    (int) (h * 0.30 + Math.cos(t * 0.30) * h * 0.08 - dy * 30), (int) (base * 0.50), ACCENT & 0xFFFFFF);
             glow(c, (int) (w * 0.82 + Math.cos(t * 0.35) * w * 0.06 - dx * 60),
-                    (int) (h * 0.78 + Math.sin(t * 0.45) * h * 0.06 - dy * 40), (int) (base * 0.42), 0x22D3EE);
+                    (int) (h * 0.78 + Math.sin(t * 0.45) * h * 0.06 - dy * 40), (int) (base * 0.42), CYAN & 0xFFFFFF);
         }
         particles(c, w, h, dx, dy);
     }
@@ -142,7 +142,7 @@ public final class Ui {
             int size = PZ[i] > 0.75f ? 2 : 1;
             float tw = 0.35f + 0.65f * (0.5f + 0.5f * (float) Math.sin(t * 1.6 + PP[i]));
             int alpha = (int) (tw * (70 + PZ[i] * 110));
-            c.fill(x, y, x + size, y + size, (alpha << 24) | (i % 3 == 0 ? 0x67E8F9 : 0xE9D5FF));
+            c.fill(x, y, x + size, y + size, (alpha << 24) | ((i % 3 == 0 ? Theme.light(CYAN) : Theme.light(ACCENT)) & 0xFFFFFF));
         }
     }
 

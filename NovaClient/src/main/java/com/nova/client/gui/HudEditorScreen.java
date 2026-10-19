@@ -46,8 +46,8 @@ public class HudEditorScreen extends NovaScreen {
                 width / 2, 28, Ui.MUTED, 1f);
 
         if (drag != null) { // centre guides while dragging
-            ctx.fill(width / 2, 0, width / 2 + 1, height, 0x4422D3EE);
-            ctx.fill(0, height / 2, width, height / 2 + 1, 0x4422D3EE);
+            ctx.fill(width / 2, 0, width / 2 + 1, height, Ui.a(Ui.CYAN, 0.27f));
+            ctx.fill(0, height / 2, width, height / 2 + 1, Ui.a(Ui.CYAN, 0.27f));
         }
         for (HudModule m : huds()) {
             int[] b = m.bounds(client);

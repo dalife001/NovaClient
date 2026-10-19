@@ -69,7 +69,7 @@ public final class AnimButton {
                 base(c, ry, al);
                 int bx = x + (w - 16) / 2, by = ry + 5;
                 if (icon >= 0) {
-                    int ic = Ui.a(Anim.lerpColor(0xFFA78BFA, 0xFF67E8F9, hover), al);
+                    int ic = Ui.a(Anim.lerpColor(Theme.light(Ui.ACCENT), Theme.light(Ui.CYAN), hover), al);
                     String[] rows = ICONS[icon];
                     for (int r = 0; r < 8; r++)
                         for (int k = 0; k < 8; k++)

@@ -17,7 +17,7 @@ import java.util.Map;
 
 /** The module menu: search, tabs, animated cards and a settings drawer. Opens with Right Shift. */
 public class ClickGuiScreen extends NovaScreen {
-    private static final String[] TABS = {"All", "HUD", "Utility", "Camera"};
+    private static final String[] TABS = {"All", "HUD", "Utility", "Camera", "Visual"};
     private static final int CH = 46, GAP = 8, DW = 160;
 
     private int tab;
@@ -160,7 +160,7 @@ public class ClickGuiScreen extends NovaScreen {
             float e = Anim.stagger(age(), 0.05f + i * 0.03f, 0.4f);
             int y = cy + (int) ((1f - e) * 10) - Math.round(hv);
             boolean sel = m == selected;
-            int border = Anim.lerpColor(Anim.lerpColor(0x30FFFFFF, 0xAA8B5CF6, onv), Ui.CYAN, Math.max(hv * 0.6f, sel ? 0.9f : 0f));
+            int border = Anim.lerpColor(Anim.lerpColor(0x30FFFFFF, Ui.a(Ui.ACCENT, 0.67f), onv), Ui.CYAN, Math.max(hv * 0.6f, sel ? 0.9f : 0f));
             Ui.round(ctx, cx - 1, y - 1, cw + 2, CH + 2, Ui.a(border, e));
             Ui.round(ctx, cx, y, cw, CH, Ui.a(Anim.lerpColor(0xFF141430, 0xFF1E1E44, hv), e));
             if (onv > 0.02f) ctx.fillGradient(cx, y + 3, cx + 2, y + CH - 3, Ui.a(Ui.ACCENT, onv * e), Ui.a(Ui.CYAN, onv * e));

@@ -41,7 +41,7 @@ public class ProfileScreen extends NovaScreen {
         Ui.round(ctx, px, py + dy, pw, ph, Ui.a(0xE80B0B1E, e));
         // left showcase column
         Ui.round(ctx, px + 8, py + 8 + dy, 154, ph - 16, Ui.a(0x66141430, e));
-        ctx.fillGradient(px + 8, py + 10 + dy, px + 162, py + ph / 2 + dy, Ui.a(0x228B5CF6, e), 0x00000000);
+        ctx.fillGradient(px + 8, py + 10 + dy, px + 162, py + ph / 2 + dy, Ui.a(Ui.a(Ui.ACCENT, 0.13f), e), 0x00000000);
     }
 
     @Override
@@ -110,7 +110,7 @@ public class ProfileScreen extends NovaScreen {
             float e = Anim.stagger(t, 0.35f + i * 0.07f, 0.45f);
             int x = rx + (i % 2) * (cw + 8), y = sy + (i / 2) * (ch + 8) + (int) ((1f - e) * 10);
             boolean hov = Ui.inside(mx, my, x, y, cw, ch);
-            Ui.round(ctx, x - 1, y - 1, cw + 2, ch + 2, Ui.a(hov ? 0xAA22D3EE : 0x33FFFFFF, e));
+            Ui.round(ctx, x - 1, y - 1, cw + 2, ch + 2, Ui.a(hov ? Ui.a(Ui.CYAN, 0.67f) : 0x33FFFFFF, e));
             Ui.round(ctx, x, y, cw, ch, Ui.a(0xFF141430, e));
             ctx.fillGradient(x, y + 3, x + 2, y + ch - 3, Ui.a(Ui.ACCENT, e), Ui.a(Ui.CYAN, e));
             Ui.text(ctx, textRenderer, stats[i][0], x + 10, y + 8, Ui.MUTED, e);

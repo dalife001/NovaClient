@@ -10,6 +10,7 @@ import com.nova.client.gui.NovaTitleScreen;
 import com.nova.client.module.ModuleManager;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
@@ -44,6 +45,9 @@ public class NovaClient implements ClientModInitializer {
 
         zoomKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.novaclient.zoom", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_C, "category.novaclient"));
+
+        // put the player's normal brightness back when the game closes
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> modules.fullbright.release());
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (client.currentScreen instanceof TitleScreen) {

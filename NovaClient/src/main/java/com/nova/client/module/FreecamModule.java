@@ -73,6 +73,6 @@ public class FreecamModule extends Module {
         String t = "FREECAM";
         int cx = mc.getWindow().getScaledWidth() / 2, w = mc.textRenderer.getWidth(t) + 16;
         com.nova.client.gui.Ui.round(ctx, cx - w / 2, 8, w, 16, 0x99090916);
-        ctx.drawCenteredTextWithShadow(mc.textRenderer, t, cx, 12, 0xFF22D3EE);
+        ctx.drawCenteredTextWithShadow(mc.textRenderer, t, cx, 12, com.nova.client.gui.Ui.CYAN);
     }
 }

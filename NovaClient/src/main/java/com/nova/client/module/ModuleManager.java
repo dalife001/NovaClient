@@ -12,6 +12,10 @@ public class ModuleManager {
     private final List<Module> modules = new ArrayList<>();
     public final FreecamModule freecam = new FreecamModule();
     public final ZoomModule zoom = new ZoomModule();
+    public final FullbrightModule fullbright = new FullbrightModule();
+    public final LowFireModule lowFire = new LowFireModule();
+    public final CrosshairModule crosshair = new CrosshairModule();
+    public final ThemeModule theme = new ThemeModule();
 
     public ModuleManager() {
         modules.add(new FpsModule());
@@ -23,9 +27,17 @@ public class ModuleManager {
         modules.add(new KeystrokesModule());
         modules.add(new ArmorHudModule());
         modules.add(new PotionHudModule());
+        modules.add(new SpeedModule());
+        modules.add(new MemoryModule());
+        modules.add(new ComboModule());
+        modules.add(new ModuleListModule());
         modules.add(new ToggleSprintModule());
         modules.add(zoom);
         modules.add(freecam);
+        modules.add(fullbright);
+        modules.add(crosshair);
+        modules.add(lowFire);
+        modules.add(theme);
 
         Config cfg = Config.get();
         for (Module m : modules) {
@@ -45,6 +57,7 @@ public class ModuleManager {
                 }
             }
         }
+        com.nova.client.gui.Theme.apply((int) theme.palette.get());
     }
 
     public List<Module> all() { return Collections.unmodifiableList(modules); }
