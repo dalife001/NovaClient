@@ -12,7 +12,7 @@ public final class Toasts {
     private record Toast(String title, String msg, int color, long born) {}
 
     private static final List<Toast> LIST = new ArrayList<>();
-    private static final long LIFE = 3200, IN = 300, OUT = 400;
+    private static final long LIFE = 3400, IN = 450, OUT = 500;
 
     private Toasts() {}
 
@@ -31,20 +31,19 @@ public final class Toasts {
                 Toast t = it.next();
                 long age = now - t.born;
                 if (age > LIFE) { it.remove(); continue; }
-                float in = Anim.easeOutBack(age / (float) IN);
+                float in = Anim.easeOutCubic(age / (float) IN);
                 float fade = Anim.clamp01(age / 200f);
                 float out = (age > LIFE - OUT ? 1f - (age - (LIFE - OUT)) / (float) OUT : 1f) * fade;
                 int tw = Math.max(120, Math.max(tr.getWidth(t.title), tr.getWidth(t.msg)) + 28);
                 int x = (w - tw) / 2;
                 int yy = y - (int) ((1f - Math.min(1f, in)) * 26); // drops in from above
-                Ui.round(c, x - 1, yy - 1, tw + 2, 30, Ui.a(0x40FFFFFF, out));
-                Ui.round(c, x, yy, tw, 28, Ui.a(0xF00B0B1C, out));
-                c.fill(x + 2, yy + 3, x + 4, yy + 25, Ui.a(t.color, out));
-                Ui.text(c, tr, t.title, x + 10, yy + 5, Ui.TEXT, out);
-                Ui.text(c, tr, t.msg, x + 10, yy + 16, Ui.MUTED, out);
-                // life bar
-                int bw = (int) ((tw - 4) * (1f - age / (float) LIFE));
-                c.fill(x + 2, yy + 26, x + 2 + Math.max(0, bw), yy + 27, Ui.a(t.color, out * 0.8f));
+                Ui.panel(c, x, yy, tw, 28, 9, 0xF0100D26, out);
+                Ui.rrect(c, x + 6, yy + 7, 3, 14, 1, Ui.a(t.color, out));
+                Ui.text(c, tr, t.title, x + 15, yy + 5, Ui.TEXT, out);
+                Ui.text(c, tr, t.msg, x + 15, yy + 16, Ui.MUTED, out);
+                // a thin line slowly drains: how long the toast stays
+                int bw = (int) ((tw - 20) * (1f - age / (float) LIFE));
+                if (bw > 1) c.fill(x + 10, yy + 26, x + 10 + bw, yy + 27, Ui.a(t.color, out * 0.55f));
                 y += 34;
             }
         }

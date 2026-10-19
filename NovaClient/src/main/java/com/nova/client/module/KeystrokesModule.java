@@ -37,12 +37,12 @@ public class KeystrokesModule extends HudModule {
     }
 
     private void key(DrawContext ctx, MinecraftClient mc, String label, int x, int y, int w, int h, float t) {
-        round(ctx, x, y, w, h, Anim.lerpColor(0x99090916, 0xE6FFFFFF, t));
+        round(ctx, x, y, w, h, Anim.lerpColor(0x8A0C0A1E, com.nova.client.gui.Ui.a(com.nova.client.gui.Ui.ACCENT, 0.92f), t));
         if (label.isEmpty()) {
-            ctx.fill(x + 14, y + 4, x + w - 14, y + 6, Anim.lerpColor(0xFF9CA3AF, 0xFF000000, t));
+            ctx.fill(x + 14, y + 4, x + w - 14, y + 6, Anim.lerpColor(0xFFA9A6C4, 0xFF1A1433, t));
             return;
         }
         ctx.drawCenteredTextWithShadow(mc.textRenderer, label, x + w / 2, y + (h - 8) / 2,
-                Anim.lerpColor(0xFFFFFFFF, 0xFF000000, t));
+                Anim.lerpColor(0xFFFFFFFF, 0xFF1A1433, t));
     }
 }

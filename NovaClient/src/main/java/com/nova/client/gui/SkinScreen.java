@@ -86,7 +86,7 @@ public class SkinScreen extends NovaScreen {
     @Override
     protected void drawBack(DrawContext ctx, int mx, int my, float delta) {
         Ui.card(ctx, px(), py(), W, 190);
-        ctx.fillGradient(px(), py(), px() + W, py() + 26, Ui.ACCENT, Ui.ACCENT_DARK);
+        Ui.headerBand(ctx, px(), py(), W);
         // preview well
         Ui.round(ctx, px() + W - 140, py() + 36, 120, 142, 0x30FFFFFF);
     }

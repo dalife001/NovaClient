@@ -37,11 +37,10 @@ public class ProfileScreen extends NovaScreen {
     protected void drawBack(DrawContext ctx, int mx, int my, float delta) {
         float e = Anim.stagger(age(), 0f, 0.4f);
         int dy = (int) ((1f - e) * 12);
-        Ui.round(ctx, px - 1, py - 1 + dy, pw + 2, ph + 2, Ui.a(0x40FFFFFF, e));
-        Ui.round(ctx, px, py + dy, pw, ph, Ui.a(0xE80B0B1E, e));
+        Ui.panel(ctx, px, py + dy, pw, ph, 9, 0xEC0E0C24, e);
         // left showcase column
-        Ui.round(ctx, px + 8, py + 8 + dy, 154, ph - 16, Ui.a(0x66141430, e));
-        ctx.fillGradient(px + 8, py + 10 + dy, px + 162, py + ph / 2 + dy, Ui.a(Ui.a(Ui.ACCENT, 0.13f), e), 0x00000000);
+        Ui.rrect(ctx, px + 8, py + 8 + dy, 154, ph - 16, 7, Ui.glass(0.05f * e));
+        ctx.fillGradient(px + 14, py + 10 + dy, px + 156, py + ph / 2 + dy, Ui.a(Ui.a(Ui.ACCENT, 0.16f), e), 0x00000000);
     }
 
     @Override
@@ -79,7 +78,7 @@ public class ProfileScreen extends NovaScreen {
 
         String badge = online ? "Microsoft account" : "Offline mode";
         int bw = textRenderer.getWidth(badge) + 12;
-        Ui.round(ctx, rx, py + 38, bw, 12, Ui.a(online ? 0xFF0B3B2E : 0xFF3B2F0B, e1));
+        Ui.rrect(ctx, rx, py + 38, bw, 12, 6, Ui.a(online ? 0xFF0F3A30 : 0xFF3B2F12, e1));
         Ui.text(ctx, textRenderer, badge, rx + 6, py + 40, online ? Ui.GREEN : Ui.AMBER, e1);
         long since = Config.get().firstLaunch;
         if (since > 0) {
@@ -93,10 +92,8 @@ public class ProfileScreen extends NovaScreen {
         Ui.text(ctx, textRenderer, "LEVEL " + PlayStats.level(), rx, ly, Ui.ACCENT, e2);
         String next = PlayStats.minutesToNext() + " min to next level";
         Ui.text(ctx, textRenderer, next, rx + rw - textRenderer.getWidth(next), ly, Ui.MUTED, e2);
-        Ui.round(ctx, rx, ly + 12, rw, 8, Ui.a(0xFF1A1A33, e2));
-        float fill = PlayStats.progress() * Anim.easeOutCubic((t - 0.5f) / 0.9f); // bar fills in
-        int fwid = Math.max(0, (int) ((rw - 2) * fill));
-        Ui.hGradient(ctx, rx + 1, ly + 13, fwid, 6, Ui.a(Ui.ACCENT, e2), Ui.a(Ui.CYAN, e2));
+        float fill = PlayStats.progress() * Anim.easeOutCubic((t - 0.5f) / 1.2f); // bar fills in slowly
+        Ui.bar(ctx, rx, ly + 12, rw, 8, fill, e2);
 
         // stat cards
         Config cfg = Config.get();
@@ -110,9 +107,9 @@ public class ProfileScreen extends NovaScreen {
             float e = Anim.stagger(t, 0.35f + i * 0.07f, 0.45f);
             int x = rx + (i % 2) * (cw + 8), y = sy + (i / 2) * (ch + 8) + (int) ((1f - e) * 10);
             boolean hov = Ui.inside(mx, my, x, y, cw, ch);
-            Ui.round(ctx, x - 1, y - 1, cw + 2, ch + 2, Ui.a(hov ? Ui.a(Ui.CYAN, 0.67f) : 0x33FFFFFF, e));
-            Ui.round(ctx, x, y, cw, ch, Ui.a(0xFF141430, e));
-            ctx.fillGradient(x, y + 3, x + 2, y + ch - 3, Ui.a(Ui.ACCENT, e), Ui.a(Ui.CYAN, e));
+            Ui.rrect(ctx, x, y, cw, ch, 7, Ui.glass((hov ? 0.10f : 0.06f) * e));
+            Ui.rim(ctx, x, y, cw, ch, 7, Ui.a(hov ? Ui.a(Ui.ACCENT, 0.7f) : Ui.glass(0.12f), e));
+            Ui.rrect(ctx, x + 4, y + 9, 2, ch - 18, 1, Ui.a(Ui.ACCENT, e));
             Ui.text(ctx, textRenderer, stats[i][0], x + 10, y + 8, Ui.MUTED, e);
             Ui.big(ctx, textRenderer, stats[i][1], x + 10 + textRenderer.getWidth(stats[i][1]) * 3 / 4, y + 22, 1.5f, Ui.TEXT, e);
         }

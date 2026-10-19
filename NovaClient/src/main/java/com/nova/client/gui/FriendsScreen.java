@@ -73,9 +73,9 @@ public class FriendsScreen extends NovaScreen {
         for (int i = 0; i < VISIBLE && scroll + i < list.size(); i++) {
             Config.Friend f = list.get(scroll + i);
             int ry = py() + 82 + i * ROW;
-            Ui.round(ctx, px() + 12, ry, W - 24, ROW - 2, 0x20FFFFFF);
+            Ui.rrect(ctx, px() + 12, ry, W - 24, ROW - 2, 5, Ui.glass(0.07f));
             boolean here = FriendsManager.isHere(f);
-            ctx.fill(px() + 20, ry + 7, px() + 26, ry + 13, here ? Ui.GREEN : 0xFF6B7280);
+            ctx.fill(px() + 20, ry + 7, px() + 26, ry + 13, here ? Ui.GREEN : 0xFF6E6A8E);
             ctx.drawTextWithShadow(textRenderer, f.name, px() + 34, ry + 6, Ui.TEXT);
             ctx.drawTextWithShadow(textRenderer, here ? "in your game" : "offline / elsewhere",
                     px() + 130, ry + 6, here ? Ui.GREEN : Ui.MUTED);

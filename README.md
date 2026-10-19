@@ -9,6 +9,33 @@ Nova/
 ```
 
 
+## What is new in v3 (Nova Serenity, client 0.6.0)
+
+The in-game client has a new identity: calm, soft and a little out of this world. Nothing flashes, everything eases.
+
+![Menu](docs/client-menu.png)
+
+- **A living night sky behind every screen**: slow aurora curtains, twinkling stars, three layers of hills with mist,
+  drifting fireflies and a shooting star every 17 seconds. Mouse parallax moves the layers gently.
+- **The hub**: a quiet left column (logo, two big "doors" for Singleplayer / Multiplayer, six small pills, your saved
+  servers under "Jump back in") in front of a slowly turning ringed planet with an orbiting moon. A time-aware
+  greeting and soft tips ("Breathe in. Pick a world.") replace the old tile grid.
+- **Truly rounded glass** everywhere (`Ui.rrect`, `Ui.panel`) instead of cut corners, with hairline rims and soft shadows.
+- **Module menu**: a floating frosted panel, a pill that glides under the active tab, pill switches, rounded sliders.
+- **HUD**: every panel is frosted glass with a thin line of light along the top edge (`module/Hud.java`).
+- **Toasts** drift down and a thin line slowly drains instead of a bar.
+- **5 calm palettes** (Twilight, Lagoon, Dusk, Meadow, Blossom). Same indexes 0-4 as before, so the launcher's
+  `-Dnova.theme` still lines up. Change it in game: Right Shift > Visual > Theme.
+
+![Palettes](docs/client-themes.png)
+
+New building blocks if you want to extend it: `gui/Cosmos.java` (the sky and the planet), `Ui.rrect / rim / panel / glow /
+sparkle / bar`, `AnimButton.Style.ROW` and `PILL`, and `Anim.breathe / smooth / easeInOutSine`.
+Colours live in `gui/Theme.java` (accent, deep accent, warm secondary, two sky colours, three aurora colours).
+
+Note: the scene is drawn with plain GUI fills (a few thousand rectangles per frame). It is fine on normal PCs; on a very weak
+machine you can lower the aurora cost by raising `step` in `Cosmos.aurora`.
+
 ## What is new in v2 (Nova Aurora design)
 
 **Launcher**: rebuilt UI with a sidebar, a hero card (your skin on an animated night scene), profile rows with a big Play button, a status column, a Console page and a dark Settings window with a memory slider. Login / install / update logic is unchanged.
@@ -57,7 +84,7 @@ HUD panels (Potion Status, Armor Status, Coordinates) use titled glass panels. S
 - **Toasts** slide in for toggles, logins, updates. Custom wallpaper with slow zoom + mouse parallax.
 
 ## Quick start (no GitHub needed)
-1. Build the mod: open `NovaClient/` in IntelliJ (or `gradle build`) -> `build/libs/novaclient-0.3.0.jar`
+1. Build the mod: open `NovaClient/` in IntelliJ (or `gradle build`) -> `build/libs/novaclient-0.6.0.jar`
 2. Run the launcher: `java -jar NovaLauncher.jar`
 3. Settings -> "Local Nova jar" -> pick that jar -> **PLAY**.
    The launcher downloads Minecraft, Fabric, Fabric API (newest), copies your jar in, and starts the game.
@@ -67,7 +94,7 @@ HUD panels (Potion Status, Armor Status, Coordinates) use titled glass panels. S
 1. Put this folder in a GitHub repo.
 2. In the launcher Settings set **Update manifest URL** to
    `https://github.com/YOU/REPO/releases/latest/download/latest.json`
-3. To ship a new version: `git tag v0.3.1 && git push --tags`.
+3. To ship a new version: `git tag v0.6.1 && git push --tags`.
    GitHub Actions builds everything and publishes `latest.json`.
 4. Every player's launcher sees it on the next PLAY: it downloads the new Nova jar (checksum verified),
    removes the old one, refreshes Fabric API, and starts. The in-game menu also shows an "Update available" card.

@@ -64,8 +64,8 @@ public abstract class NovaScreen extends Screen {
         drawFront(ctx, mx, my, delta);
         for (AnimButton b : buttons) b.draw(ctx, textRenderer, mx, my, 1f, 0);
         Toasts.render(ctx, textRenderer, width, height);
-        float f = 1f - Anim.clamp01(age() / 0.22f); // quick fade in from black
-        if (f > 0.02f) ctx.fill(0, 0, width, height, ((int) (f * 255f)) << 24);
+        float f = 1f - Anim.smooth(age() / 0.55f); // slow fade in from deep night blue
+        if (f > 0.02f) ctx.fill(0, 0, width, height, (((int) (f * 255f)) << 24) | 0x070716);
     }
 
     @Override

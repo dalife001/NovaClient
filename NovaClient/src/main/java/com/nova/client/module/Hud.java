@@ -1,30 +1,34 @@
 package com.nova.client.module;
 
+import com.nova.client.gui.Anim;
 import com.nova.client.gui.Ui;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 
-/** Shared look for every HUD element: dark glass panels with a Nova accent edge and optional title bar. */
+/** Shared look for every HUD element: soft frosted glass with a thin glowing line along the top edge. */
 public final class Hud {
-    /** Height of the title bar on titled panels. */
+    /** Height of the title area on titled panels. */
     public static final int TITLE_H = 13;
 
     private Hud() {}
 
-    /** Plain glass panel with an accent strip on the left and a faint outline. */
-    public static void panel(DrawContext c, int x, int y, int w, int h) {
-        Ui.round(c, x, y, w, h, 0xB00A0A16);
-        Ui.outline(c, x + 1, y + 1, w - 2, h - 2, 0x22FFFFFF);
-        c.fillGradient(x, y + 2, x + 2, y + h - 2, Ui.ACCENT, Ui.CYAN);
+    private static void glass(DrawContext c, int x, int y, int w, int h) {
+        Ui.rrect(c, x, y, w, h, 4, 0x940C0A1E);
+        Ui.rim(c, x, y, w, h, 4, Ui.glass(0.10f));
+        // the signature: a hairline of light that flows from accent to the warm secondary colour
+        Ui.hGradient(c, x + 5, y + 1, w - 10, 1, Ui.a(Ui.ACCENT, 0.85f), Ui.a(Ui.CYAN, 0.85f));
     }
 
-    /** Panel with a gradient title bar on top (content starts at y + TITLE_H). */
+    /** Plain glass panel. */
+    public static void panel(DrawContext c, int x, int y, int w, int h) {
+        glass(c, x, y, w, h);
+    }
+
+    /** Panel with a small title on top (content starts at y + TITLE_H). */
     public static void titled(DrawContext c, MinecraftClient mc, int x, int y, int w, int h, String title) {
-        Ui.round(c, x, y, w, h, 0xB00A0A16);
-        Ui.outline(c, x + 1, y + 1, w - 2, h - 2, 0x22FFFFFF);
-        Ui.hGradient(c, x + 2, y + 1, w - 4, TITLE_H - 2, Ui.a(Ui.ACCENT_DARK, 0.8f), Ui.a(Ui.CYAN, 0.55f));
-        c.fill(x + 2, y + TITLE_H - 1, x + w - 2, y + TITLE_H, 0x33FFFFFF);
-        c.drawTextWithShadow(mc.textRenderer, title, x + 6, y + 3, 0xFFF5F3FF);
+        glass(c, x, y, w, h);
+        c.drawTextWithShadow(mc.textRenderer, title, x + 6, y + 3, Anim.lerpColor(Ui.ACCENT, 0xFFFFFFFF, 0.55f));
+        c.fill(x + 5, y + TITLE_H - 1, x + w - 5, y + TITLE_H, Ui.glass(0.10f));
     }
 
     /** Width a titled panel needs so its title always fits. */

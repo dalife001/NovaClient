@@ -99,7 +99,7 @@ public class ClickGuiScreen extends NovaScreen {
     @Override
     public void renderBackground(DrawContext ctx, int mx, int my, float delta) {
         if (parent != null) Ui.background(ctx, width, height);
-        else ctx.fill(0, 0, width, height, 0xB0000010); // see-through when in-game
+        else ctx.fillGradient(0, 0, width, height, 0xB0070716, 0xD0120E2C); // see-through when in-game
         drawBack(ctx, mx, my, delta);
     }
 
@@ -113,9 +113,8 @@ public class ClickGuiScreen extends NovaScreen {
         scroll = Anim.approach(scroll, scrollTarget, dt, 14f);
         drawer = Anim.approach(drawer, selected != null ? 1f : 0f, dt, 12f);
 
-        Ui.round(ctx, px - 1, py - 1, pw + 2, ph + 2, 0x44FFFFFF);
-        Ui.round(ctx, px, py, pw, ph, 0xF00B0B1E);
-        ctx.fillGradient(px + 1, py + 1, px + pw - 1, py + 30, Ui.ACCENT, Ui.ACCENT_DARK);
+        Ui.panel(ctx, px, py, pw, ph, 9, 0xF00E0C24, 1f);
+        ctx.fillGradient(px + 9, py + 1, px + pw - 9, py + 32, Ui.a(Ui.ACCENT, 0.16f), Ui.a(Ui.ACCENT, 0f));
 
         editorBtn.x = px + pw - 12 - editorBtn.w;
         editorBtn.y = py + 7;
@@ -124,22 +123,29 @@ public class ClickGuiScreen extends NovaScreen {
 
     @Override
     protected void drawFront(DrawContext ctx, int mx, int my, float delta) {
-        Ui.text(ctx, textRenderer, "Modules", px + 14, py + 11, Ui.TEXT, 1f);
+        Ui.text(ctx, textRenderer, "Modules", px + 24, py + 11, Ui.TEXT, 1f);
+        Ui.sparkle(ctx, px + 16, py + 15, 2, Ui.a(Theme.light(Ui.CYAN), 0.6f + 0.4f * Anim.breathe(4f, 0f)));
 
-        // ---- tabs ----
+        // ---- tabs: a soft pill glides under the active one ----
+        for (int i = 0; i < TABS.length; i++) {
+            int x = tabX(i), w = textRenderer.getWidth(TABS[i]);
+            if (i == tab) {
+                if (tabX < 0) { tabX = x; tabW = w; }
+                tabX = Anim.approach(tabX, x, dt, 12f);
+                tabW = Anim.approach(tabW, w, dt, 12f);
+            }
+        }
+        if (tabX >= 0) {
+            Ui.rrect(ctx, (int) tabX - 7, py + 35, (int) tabW + 14, 17, 8, Ui.a(Ui.ACCENT, 0.20f));
+            Ui.rim(ctx, (int) tabX - 7, py + 35, (int) tabW + 14, 17, 8, Ui.a(Ui.ACCENT, 0.45f));
+        }
         for (int i = 0; i < TABS.length; i++) {
             int x = tabX(i), w = textRenderer.getWidth(TABS[i]);
             boolean active = i == tab;
             boolean h = Ui.inside(mx, my, x - 6, py + 36, w + 12, 18);
-            Ui.text(ctx, textRenderer, TABS[i], x, py + 40, active ? Ui.TEXT : h ? 0xFFD1D5DB : Ui.MUTED, 1f);
-            if (active) {
-                if (tabX < 0) { tabX = x; tabW = w; }
-                tabX = Anim.approach(tabX, x, dt, 16f);
-                tabW = Anim.approach(tabW, w, dt, 16f);
-            }
+            Ui.text(ctx, textRenderer, TABS[i], x, py + 40, active ? Ui.TEXT : h ? 0xFFD8D4EE : Ui.MUTED, 1f);
         }
-        if (tabX >= 0) Ui.hGradient(ctx, (int) tabX, py + 52, (int) tabW, 2, Ui.ACCENT, Ui.CYAN);
-        ctx.fill(px + 14, py + 54, px + pw - 14, py + 55, 0x22FFFFFF);
+        ctx.fill(px + 14, py + 56, px + pw - 14, py + 57, Ui.glass(0.07f));
 
         // ---- cards ----
         List<Module> list = filtered();
@@ -160,23 +166,25 @@ public class ClickGuiScreen extends NovaScreen {
             float e = Anim.stagger(age(), 0.05f + i * 0.03f, 0.4f);
             int y = cy + (int) ((1f - e) * 10) - Math.round(hv);
             boolean sel = m == selected;
-            int border = Anim.lerpColor(Anim.lerpColor(0x30FFFFFF, Ui.a(Ui.ACCENT, 0.67f), onv), Ui.CYAN, Math.max(hv * 0.6f, sel ? 0.9f : 0f));
-            Ui.round(ctx, cx - 1, y - 1, cw + 2, CH + 2, Ui.a(border, e));
-            Ui.round(ctx, cx, y, cw, CH, Ui.a(Anim.lerpColor(0xFF141430, 0xFF1E1E44, hv), e));
-            if (onv > 0.02f) ctx.fillGradient(cx, y + 3, cx + 2, y + CH - 3, Ui.a(Ui.ACCENT, onv * e), Ui.a(Ui.CYAN, onv * e));
+            Ui.rrect(ctx, cx, y, cw, CH, 7, Ui.a(Anim.lerpColor(Ui.glass(0.05f), Ui.a(Ui.ACCENT, 0.16f), onv), e));
+            if (hv > 0.02f) Ui.rrect(ctx, cx, y, cw, CH, 7, Ui.glass(0.05f * hv * e));
+            int rimc = Anim.lerpColor(Anim.lerpColor(Ui.glass(0.10f), Ui.a(Ui.ACCENT, 0.55f), onv), Ui.a(Ui.CYAN, 0.8f), Math.max(hv * 0.5f, sel ? 0.8f : 0f));
+            Ui.rim(ctx, cx, y, cw, CH, 7, Ui.a(rimc, e));
+            if (onv > 0.02f) Ui.rrect(ctx, cx + 4, y + 9, 2, CH - 18, 1, Ui.a(Ui.ACCENT, onv * e));
 
-            Ui.text(ctx, textRenderer, m.name, cx + 10, y + 8, Ui.TEXT, e);
-            Ui.text(ctx, textRenderer, textRenderer.trimToWidth(m.description, cw - 20), cx + 10, y + 20, Ui.MUTED, e);
+            Ui.text(ctx, textRenderer, m.name, cx + 12, y + 8, Ui.TEXT, e);
+            Ui.text(ctx, textRenderer, textRenderer.trimToWidth(m.description, cw - 22), cx + 12, y + 20, Ui.MUTED, e);
 
+            // soft pill switch
             int sx = cx + cw - 36, sy = y + CH - 15;
-            Ui.round(ctx, sx, sy, 26, 10, Ui.a(Anim.lerpColor(0xFF4B4B63, Ui.GREEN, onv), e));
+            Ui.rrect(ctx, sx, sy, 26, 10, 5, Ui.a(Anim.lerpColor(0xFF3B3858, Ui.ACCENT, onv), e));
             int kx = (int) Anim.lerp(sx + 1, sx + 17, onv);
-            ctx.fill(kx, sy + 1, kx + 8, sy + 9, Ui.a(0xFFFFFFFF, e));
+            Ui.rrect(ctx, kx, sy + 1, 8, 8, 4, Ui.a(0xFFFFFFFF, e));
 
             if (!m.settings.isEmpty()) {
                 boolean gh2 = Ui.inside(mx, my, cx + cw - 18, y + 4, 16, 16);
                 int dc = Ui.a(gh2 || sel ? Ui.CYAN : Ui.MUTED, e);
-                for (int d = 0; d < 3; d++) ctx.fill(cx + cw - 11, y + 7 + d * 4, cx + cw - 9, y + 9 + d * 4, dc);
+                for (int d = 0; d < 3; d++) ctx.fill(cx + cw - 12, y + 7 + d * 4, cx + cw - 10, y + 9 + d * 4, dc);
             }
         }
         ctx.disableScissor();
@@ -185,7 +193,7 @@ public class ClickGuiScreen extends NovaScreen {
         if (ms > 0) {
             int bh = Math.max(16, gh * gh / (gh + ms));
             int by = gy + (int) ((gh - bh) * (scroll / ms));
-            Ui.round(ctx, gx + gw + 2, by, 3, bh, 0x66FFFFFF);
+            Ui.rrect(ctx, gx + gw + 2, by, 3, bh, 1, Ui.glass(0.28f));
         }
 
         drawDrawer(ctx, mx, my);
@@ -197,8 +205,8 @@ public class ClickGuiScreen extends NovaScreen {
         int dx = px + pw - 14 - DW + (int) ((1f - a) * 24), dy = gy;
         Module m = selected;
 
-        Ui.round(ctx, dx - 1, dy - 1, DW + 2, gh + 2, Ui.a(0x44FFFFFF, a));
-        Ui.round(ctx, dx, dy, DW, gh, Ui.a(0xFF10102A, a));
+        Ui.rrect(ctx, dx, dy, DW, gh, 8, Ui.a(0xFF15122F, a));
+        Ui.rim(ctx, dx, dy, DW, gh, 8, Ui.glass(0.14f * a));
         Ui.text(ctx, textRenderer, m.name, dx + 10, dy + 10, Ui.TEXT, a);
         Ui.text(ctx, textRenderer, m.category(), dx + DW - 10 - textRenderer.getWidth(m.category()), dy + 10, Ui.ACCENT, a);
 
@@ -206,7 +214,7 @@ public class ClickGuiScreen extends NovaScreen {
         toggleBtn.y = dy + 26;
         toggleBtn.label = m.isEnabled() ? "Enabled" : "Disabled";
         toggleBtn.draw(ctx, textRenderer, mx, my, a, 0);
-        if (m.isEnabled()) Ui.hGradient(ctx, toggleBtn.x + 1, toggleBtn.y + 18, toggleBtn.w - 2, 1, Ui.a(Ui.GREEN, a), Ui.a(Ui.CYAN, a));
+        if (m.isEnabled()) Ui.rrect(ctx, toggleBtn.x + 8, toggleBtn.y + 17, toggleBtn.w - 16, 1, 0, Ui.a(Ui.GREEN, a * 0.8f));
 
         int sy = dy + 58;
         for (NumberSetting s : m.settings) {
@@ -214,10 +222,9 @@ public class ClickGuiScreen extends NovaScreen {
             Ui.text(ctx, textRenderer, s.name, dx + 10, sy, Ui.MUTED, a);
             Ui.text(ctx, textRenderer, val, dx + DW - 10 - textRenderer.getWidth(val), sy, Ui.TEXT, a);
             int tx = dx + 10, tw = DW - 20, ty = sy + 14;
-            Ui.round(ctx, tx, ty, tw, 6, Ui.a(0xFF222244, a));
             int fw = (int) (tw * s.fraction());
-            Ui.hGradient(ctx, tx, ty, Math.max(3, fw), 6, Ui.a(Ui.ACCENT, a), Ui.a(Ui.CYAN, a));
-            Ui.round(ctx, tx + fw - 3, ty - 2, 6, 10, Ui.a(0xFFFFFFFF, a));
+            Ui.bar(ctx, tx, ty, tw, 6, (float) s.fraction(), a);
+            Ui.rrect(ctx, tx + fw - 4, ty - 1, 8, 8, 4, Ui.a(0xFFFFFFFF, a));
             sy += 34;
         }
         if (m instanceof HudModule) {

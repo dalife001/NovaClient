@@ -72,7 +72,8 @@ public class FreecamModule extends Module {
     public void onRender(DrawContext ctx, MinecraftClient mc) {
         String t = "FREECAM";
         int cx = mc.getWindow().getScaledWidth() / 2, w = mc.textRenderer.getWidth(t) + 16;
-        com.nova.client.gui.Ui.round(ctx, cx - w / 2, 8, w, 16, 0x99090916);
+        com.nova.client.gui.Ui.rrect(ctx, cx - w / 2, 8, w, 16, 8, 0x940C0A1E);
+        com.nova.client.gui.Ui.rim(ctx, cx - w / 2, 8, w, 16, 8, com.nova.client.gui.Ui.a(com.nova.client.gui.Ui.CYAN, 0.5f));
         ctx.drawCenteredTextWithShadow(mc.textRenderer, t, cx, 12, com.nova.client.gui.Ui.CYAN);
     }
 }

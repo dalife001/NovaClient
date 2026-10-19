@@ -37,8 +37,8 @@ public class ModuleListModule extends HudModule {
         for (int i = 0; i < n.size(); i++) {
             int tw = mc.textRenderer.getWidth(n.get(i));
             int y = i * 12;
-            ctx.fill(w - tw - 12, y, w, y + 12, 0x990A0A16);
-            ctx.fillGradient(w - 2, y, w, y + 12, Ui.ACCENT, Ui.CYAN);
+            Ui.rrect(ctx, w - tw - 12, y, tw + 12, 11, 3, 0x940C0A1E);
+            ctx.fillGradient(w - 2, y + 2, w, y + 9, Ui.ACCENT, Ui.CYAN);
             ctx.drawTextWithShadow(mc.textRenderer, n.get(i), w - tw - 7, y + 2, 0xFFFFFFFF);
         }
     }
