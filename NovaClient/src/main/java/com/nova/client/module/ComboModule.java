@@ -14,7 +14,12 @@ public class ComboModule extends SimpleHudModule {
     public ComboModule() {
         super("Combo", "Hits in a row", false, 6, 210, false, false);
         AttackEntityCallback.EVENT.register((player, world, hand, entity, hit) -> {
-            if (world.isClient && entity instanceof LivingEntity) {
+            //#if MC >= 2109
+            boolean clientSide = world.isClient();
+            //#else
+            boolean clientSide = world.isClient;
+            //#endif
+            if (clientSide && entity instanceof LivingEntity) {
                 long now = System.currentTimeMillis();
                 if (now - lastHit > TIMEOUT_MS) combo = 0;
                 combo++;

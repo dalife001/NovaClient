@@ -60,7 +60,12 @@ public final class FriendsManager {
         ClientPlayNetworkHandler h = MinecraftClient.getInstance().getNetworkHandler();
         if (h == null) return false;
         for (PlayerListEntry e : h.getPlayerList()) {
-            if (e.getProfile().getName().equalsIgnoreCase(f.name)) return true;
+            //#if MC >= 2109
+            String playerName = e.getProfile().name();
+            //#else
+            String playerName = e.getProfile().getName();
+            //#endif
+            if (playerName.equalsIgnoreCase(f.name)) return true;
         }
         return false;
     }

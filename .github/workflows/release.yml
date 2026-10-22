@@ -116,7 +116,7 @@ jobs:
           java-version: 21
       - name: Build launcher
         working-directory: NovaLauncher
-        run: ./build.sh
+        run: bash ./build.sh
       - name: Self test
         working-directory: NovaLauncher
         run: java -cp NovaLauncher.jar com.nova.launcher.SelfTest
