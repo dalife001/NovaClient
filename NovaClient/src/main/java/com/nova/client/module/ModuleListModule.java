@@ -1,9 +1,9 @@
 package com.nova.client.module;
 
+import com.nova.client.gui.Gfx;
 import com.nova.client.NovaClient;
 import com.nova.client.gui.Ui;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +30,7 @@ public class ModuleListModule extends HudModule {
     @Override protected int contentH(MinecraftClient mc) { return Math.max(1, names().size()) * 12; }
 
     @Override
-    protected void draw(DrawContext ctx, MinecraftClient mc) {
+    protected void draw(Gfx ctx, MinecraftClient mc) {
         int w = contentW(mc);
         List<String> n = names();
         if (n.isEmpty()) { ctx.drawTextWithShadow(mc.textRenderer, "nothing on", w - 6 - mc.textRenderer.getWidth("nothing on"), 2, 0xFF6B7280); return; }

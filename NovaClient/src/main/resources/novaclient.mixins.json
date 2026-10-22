@@ -1,16 +1,15 @@
 {
-  "required": true,
+  "required": ${mixin_required},
   "package": "com.nova.client.mixin",
-  "compatibilityLevel": "JAVA_21",
+  "compatibilityLevel": "${java_level}",
   "client": [
-    "CameraMixin",
-    "EntityMixin",
-    "KeyboardInputMixin",
     "MinecraftClientAccessor",
     "GameRendererMixin",
     "InGameHudMixin",
-    "InGameOverlayRendererMixin",
-    "SimpleOptionAccessor"
+    "InGameOverlayRendererMixin"
+    //#if MC >= 1900
+    ,"SimpleOptionAccessor"
+    //#endif
   ],
-  "injectors": { "defaultRequire": 1 }
+  "injectors": { "defaultRequire": ${mixin_require} }
 }

@@ -27,6 +27,10 @@ final class SettingsDialog extends JDialog {
         JTextField localJar = field(cfg.localModJar);
         JTextField bgImg = field(cfg.backgroundPath);
         JTextField java = field(cfg.javaPath);
+        JCheckBox useNova = new JCheckBox("Load Nova Client (off = plain Fabric)", cfg.useNova);
+        useNova.setOpaque(false);
+        useNova.setForeground(LauncherApp.TEXT);
+        useNova.setFont(LauncherApp.font(Font.PLAIN, 13f));
         JSlider ram = new JSlider(1024, 16384, Math.max(1024, Math.min(16384, cfg.ramMb)));
         ram.setOpaque(false);
         ram.setMajorTickSpacing(1024);
@@ -39,6 +43,7 @@ final class SettingsDialog extends JDialog {
         r = row(p, c, r, "Offline player name", offline, null);
         r = row(p, c, r, "Update manifest URL (latest.json)", manifest, null);
         r = row(p, c, r, "Minecraft version (blank = auto)", mcv, null);
+        r = row(p, c, r, "Nova Client", useNova, null);
         r = row(p, c, r, "Local Nova jar (optional)", localJar, browse(localJar, "jar"));
         r = row(p, c, r, "Background image", bgImg, browse(bgImg, "png", "jpg", "jpeg"));
         r = row(p, c, r, "Java path (blank = auto)", java, null);
@@ -52,6 +57,7 @@ final class SettingsDialog extends JDialog {
             cfg.offlineName = offline.getText().trim().isEmpty() ? "Player" : offline.getText().trim();
             cfg.manifestUrl = manifest.getText().trim();
             cfg.mcVersion = mcv.getText().trim();
+            cfg.useNova = useNova.isSelected();
             cfg.localModJar = localJar.getText().trim();
             cfg.backgroundPath = bgImg.getText().trim();
             cfg.javaPath = java.getText().trim();

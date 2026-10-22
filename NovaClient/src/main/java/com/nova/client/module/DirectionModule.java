@@ -1,5 +1,6 @@
 package com.nova.client.module;
 
+import com.nova.client.compat.Mc;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.math.MathHelper;
 
@@ -10,7 +11,7 @@ public class DirectionModule extends SimpleHudModule {
     @Override protected String label() { return "FACING"; }
     @Override protected String value(MinecraftClient mc) {
         if (mc.player == null) return "-";
-        float yaw = ((MathHelper.wrapDegrees(mc.player.getYaw()) % 360) + 360) % 360;
+        float yaw = ((MathHelper.wrapDegrees(Mc.yaw(mc.player)) % 360) + 360) % 360;
         int idx = Math.round(yaw / 45f) % 8;
         return DIRS[idx] + " (" + Math.round(yaw) + "\u00B0)";
     }

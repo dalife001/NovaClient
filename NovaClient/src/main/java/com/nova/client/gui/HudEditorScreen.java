@@ -3,7 +3,6 @@ package com.nova.client.gui;
 import com.nova.client.NovaClient;
 import com.nova.client.module.HudModule;
 import com.nova.client.module.Module;
-import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 
 import java.util.ArrayList;
@@ -18,29 +17,29 @@ public class HudEditorScreen extends NovaScreen {
 
     private List<HudModule> huds() {
         List<HudModule> out = new ArrayList<>();
-        for (Module m : NovaClient.modules.all()) if (m instanceof HudModule h && h.isEnabled()) out.add(h);
+        for (Module m : NovaClient.modules.all()) if (m instanceof HudModule && m.isEnabled()) out.add((HudModule) m);
         return out;
     }
 
     @Override
     protected void build() {
-        button(width / 2 - 92, height - 30, 88, 18, "Done", true, this::close);
+        button(width / 2 - 92, height - 30, 88, 18, "Done", true, this::nClose);
         button(width / 2 + 4, height - 30, 88, 18, "Reset all", false, () -> {
-            for (Module m : NovaClient.modules.all()) if (m instanceof HudModule h) h.resetPosition();
+            for (Module m : NovaClient.modules.all()) if (m instanceof HudModule) ((HudModule) m).resetPosition();
             NovaClient.modules.saveStates();
             Toasts.push("HUD Editor", "Positions reset", Ui.CYAN);
         });
     }
 
     @Override
-    public void renderBackground(DrawContext ctx, int mx, int my, float delta) {
+    protected void nBackground(Gfx ctx, int mx, int my, float delta) {
         ctx.fill(0, 0, width, height, 0xB0050510);
         for (int x = 10; x < width; x += 20)
             for (int y = 10; y < height; y += 20) ctx.fill(x, y, x + 1, y + 1, 0x22FFFFFF);
     }
 
     @Override
-    protected void drawFront(DrawContext ctx, int mx, int my, float delta) {
+    protected void drawFront(Gfx ctx, int mx, int my, float delta) {
         Ui.centered(ctx, textRenderer, "HUD Editor", width / 2, 14, Ui.TEXT, 1f);
         Ui.centered(ctx, textRenderer, "Drag to move  \u2022  Scroll to resize  \u2022  Turn elements on in the module menu",
                 width / 2, 28, Ui.MUTED, 1f);
@@ -60,7 +59,7 @@ public class HudEditorScreen extends NovaScreen {
     }
 
     @Override
-    public boolean mouseClicked(double mx, double my, int button) {
+    protected boolean nClick(double mx, double my, int button) {
         if (button == 0) {
             List<HudModule> l = huds();
             for (int i = l.size() - 1; i >= 0; i--) {
@@ -73,11 +72,11 @@ public class HudEditorScreen extends NovaScreen {
                 }
             }
         }
-        return super.mouseClicked(mx, my, button);
+        return super.nClick(mx, my, button);
     }
 
     @Override
-    public boolean mouseDragged(double mx, double my, int button, double dX, double dY) {
+    protected boolean nDrag(double mx, double my, int button, double dX, double dY) {
         if (drag != null) {
             int[] b = drag.bounds(client);
             int x = (int) mx - gx, y = (int) my - gy;
@@ -91,21 +90,21 @@ public class HudEditorScreen extends NovaScreen {
             drag.moveTo(client, x, y, b[2], b[3]);
             return true;
         }
-        return super.mouseDragged(mx, my, button, dX, dY);
+        return super.nDrag(mx, my, button, dX, dY);
     }
 
     @Override
-    public boolean mouseReleased(double mx, double my, int button) {
+    protected boolean nRelease(double mx, double my, int button) {
         if (drag != null) {
             drag = null;
             NovaClient.modules.saveStates();
             return true;
         }
-        return super.mouseReleased(mx, my, button);
+        return super.nRelease(mx, my, button);
     }
 
     @Override
-    public boolean mouseScrolled(double mx, double my, double h, double v) {
+    protected boolean nScroll(double mx, double my, double h, double v) {
         for (HudModule m : huds()) {
             int[] b = m.bounds(client);
             if (Ui.inside(mx, my, b[0], b[1], b[2], b[3])) {
@@ -114,15 +113,15 @@ public class HudEditorScreen extends NovaScreen {
                 return true;
             }
         }
-        return super.mouseScrolled(mx, my, h, v);
+        return super.nScroll(mx, my, h, v);
     }
 
     @Override
-    public void close() {
+    protected void nClose() {
         NovaClient.modules.saveStates();
-        super.close();
+        super.nClose();
     }
 
     @Override
-    public boolean shouldPause() { return false; }
+    protected boolean pausesGame() { return false; }
 }

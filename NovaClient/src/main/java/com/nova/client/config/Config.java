@@ -1,5 +1,6 @@
 package com.nova.client.config;
 
+import com.nova.client.util.S;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.fabricmc.loader.api.FabricLoader;
@@ -40,12 +41,12 @@ public final class Config {
     }
 
     public String background() {
-        if (backgroundPath != null && !backgroundPath.isBlank()) return backgroundPath;
+        if (!S.blank(backgroundPath)) return backgroundPath;
         return System.getProperty("nova.background", "");
     }
 
     public String manifestUrl() {
-        if (updateManifestUrl != null && !updateManifestUrl.isBlank()) return updateManifestUrl;
+        if (!S.blank(updateManifestUrl)) return updateManifestUrl;
         return System.getProperty("nova.manifest", "");
     }
 
@@ -64,7 +65,7 @@ public final class Config {
     public static synchronized void load() {
         try {
             Path p = path();
-            if (Files.exists(p)) instance = GSON.fromJson(Files.readString(p), Config.class);
+            if (Files.exists(p)) instance = GSON.fromJson(S.read(p), Config.class);
         } catch (Exception ignored) {}
         if (instance == null) instance = new Config();
         if (instance.modules == null) instance.modules = new HashMap<>();
@@ -75,7 +76,7 @@ public final class Config {
 
     public static synchronized void save() {
         try {
-            Files.writeString(path(), GSON.toJson(get()));
+            S.write(path(), GSON.toJson(get()));
         } catch (IOException e) {
             e.printStackTrace();
         }

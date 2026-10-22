@@ -1,20 +1,15 @@
 package com.nova.client.gui;
 
+import com.nova.client.compat.Mc;
 import com.nova.client.NovaClient;
 import com.nova.client.PlayStats;
 import com.nova.client.UpdateChecker;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.multiplayer.ConnectScreen;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen;
 import net.minecraft.client.gui.screen.option.OptionsScreen;
-import net.minecraft.client.gui.screen.pack.PackScreen;
 import net.minecraft.client.gui.screen.world.SelectWorldScreen;
-import net.minecraft.client.network.ServerAddress;
 import net.minecraft.client.network.ServerInfo;
 import net.minecraft.client.option.ServerList;
-import net.minecraft.resource.ResourcePackManager;
-import net.minecraft.text.Text;
 
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -68,20 +63,20 @@ public class NovaTitleScreen extends NovaScreen {
         int y = logoY + (int) (8 * logoScale) + (compact ? 22 : 38);
 
         add(new AnimButton(left, y, colW, rowH, "Singleplayer", AnimButton.Style.ROW,
-                () -> client.setScreen(new SelectWorldScreen(this))).sub("Your worlds").icon(6), 0.35f);
+                () -> Mc.setScreen(client, new SelectWorldScreen(this))).sub("Your worlds").icon(6), 0.35f);
         y += rowH + 2;
         add(new AnimButton(left, y, colW, rowH, "Multiplayer", AnimButton.Style.ROW,
-                () -> client.setScreen(new MultiplayerScreen(this))).sub("Servers and friends").icon(7), 0.43f);
+                () -> Mc.setScreen(client, new MultiplayerScreen(this))).sub("Servers and friends").icon(7), 0.43f);
         y += rowH + (compact ? 8 : 12);
 
         String[] names = {"Mods", "Friends", "Skins", "Textures", "Shaders", "Settings"};
         Runnable[] acts = {
-                () -> client.setScreen(new ClickGuiScreen(this)),
-                () -> client.setScreen(new FriendsScreen(this)),
-                () -> client.setScreen(new SkinScreen(this)),
+                () -> Mc.setScreen(client, new ClickGuiScreen(this)),
+                () -> Mc.setScreen(client, new FriendsScreen(this)),
+                () -> Mc.setScreen(client, new SkinScreen(this)),
                 this::openPacks,
                 this::openShaders,
-                () -> client.setScreen(new SettingsScreen(this))};
+                () -> Mc.setScreen(client, new SettingsScreen(this))};
         int gap = 6, pw = (colW - 2 * gap) / 3, ph = 18;
         for (int i = 0; i < 6; i++) {
             int px = left + (i % 3) * (pw + gap), py = y + (i / 3) * (ph + 5);
@@ -101,13 +96,13 @@ public class NovaTitleScreen extends NovaScreen {
                     ServerInfo info = sl.get(i);
                     String label = textRenderer.trimToWidth(info.name, chipW - 14);
                     add(new AnimButton(left + i * (chipW + gap), y + 12, chipW, 16, label, AnimButton.Style.PILL, () ->
-                            ConnectScreen.connect(this, client, ServerAddress.parse(info.address), info, false, null)), 0.9f + i * 0.05f);
+                            Mc.connect(this, client, info)), 0.9f + i * 0.05f);
                 }
             }
         } catch (Throwable ignored) {}
 
         add(new AnimButton(width - 112, height - 22, 50, 16, "Options", AnimButton.Style.GHOST,
-                () -> client.setScreen(new OptionsScreen(this, client.options))), 1.0f);
+                () -> Mc.setScreen(client, new OptionsScreen(this, client.options))), 1.0f);
         add(new AnimButton(width - 58, height - 22, 44, 16, "Quit", AnimButton.Style.GHOST, () -> client.scheduleStop()), 1.0f);
 
         // the planet sits in the free space on the right
@@ -118,21 +113,13 @@ public class NovaTitleScreen extends NovaScreen {
         planetY = (int) (height * 0.44f);
     }
 
-    private void openPacks() {
-        client.setScreen(new PackScreen(client.getResourcePackManager(), this::applyPacks,
-                client.getResourcePackDir(), Text.translatable("resourcePack.title")));
-    }
-
-    private void applyPacks(ResourcePackManager manager) {
-        client.options.refreshResourcePacks(manager);
-        client.setScreen(this);
-    }
+    private void openPacks() { Mc.openPacks(client, this); }
 
     /** Opens Iris's shader pack screen (looked up by name so the menu never breaks if Iris changes). */
     private void openShaders() {
         try {
             Class<?> c = Class.forName("net.irisshaders.iris.gui.screen.ShaderPackScreen");
-            client.setScreen((Screen) c.getConstructor(Screen.class).newInstance(this));
+            Mc.setScreen(client, (Screen) c.getConstructor(Screen.class).newInstance(this));
         } catch (Throwable t) {
             Toasts.push("Shaders", "Iris is not loaded", Ui.RED);
         }
@@ -146,7 +133,7 @@ public class NovaTitleScreen extends NovaScreen {
 
     /** The planet lives in the background layer so it is always behind the menu. */
     @Override
-    protected void drawBack(DrawContext ctx, int mx, int my, float delta) {
+    protected void drawBack(Gfx ctx, int mx, int my, float delta) {
         float t = age();
         float e = Anim.stagger(t, 0.2f, 1.6f);
         float bob = (float) Math.sin(Anim.seconds() * 0.35f) * 3f;
@@ -156,7 +143,7 @@ public class NovaTitleScreen extends NovaScreen {
     }
 
     @Override
-    protected void drawFront(DrawContext ctx, int mx, int my, float delta) {
+    protected void drawFront(Gfx ctx, int mx, int my, float delta) {
         float t = age();
         SkinCache.ensure();
 
@@ -205,7 +192,7 @@ public class NovaTitleScreen extends NovaScreen {
         Ui.text(ctx, textRenderer, TIPS[(int) (t / 7f) % TIPS.length], left + 2, height - 20, Ui.MUTED, ta * 0.9f);
     }
 
-    private void drawPill(DrawContext ctx, int mx, int my, float e) {
+    private void drawPill(Gfx ctx, int mx, int my, float e) {
         long now = System.nanoTime();
         float dt = Math.min(0.1f, (now - pillLast) / 1e9f);
         pillLast = now;
@@ -227,11 +214,11 @@ public class NovaTitleScreen extends NovaScreen {
     }
 
     @Override
-    public boolean mouseClicked(double mx, double my, int button) {
+    protected boolean nClick(double mx, double my, int button) {
         if (button == 0) {
             if (Ui.inside(mx, my, pillX, pillY, pillW, pillH)) {
                 click();
-                client.setScreen(new ProfileScreen(this));
+                Mc.setScreen(client, new ProfileScreen(this));
                 return true;
             }
             for (AnimButton b : hub) {
@@ -242,7 +229,7 @@ public class NovaTitleScreen extends NovaScreen {
                 }
             }
         }
-        return super.mouseClicked(mx, my, button);
+        return super.nClick(mx, my, button);
     }
 
     @Override

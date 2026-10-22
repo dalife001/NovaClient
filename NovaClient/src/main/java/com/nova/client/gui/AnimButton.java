@@ -1,7 +1,6 @@
 package com.nova.client.gui;
 
 import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
 
 /** A button with a slow, soft hover animation. Frosted glass instead of hard borders. */
 public final class AnimButton {
@@ -40,7 +39,7 @@ public final class AnimButton {
 
     public boolean hit(double mx, double my) { return enabled && Ui.inside(mx, my, x, y, w, h); }
 
-    public void draw(DrawContext c, TextRenderer tr, int mx, int my, float alpha, int yOff) {
+    public void draw(Gfx c, TextRenderer tr, int mx, int my, float alpha, int yOff) {
         long now = System.nanoTime();
         float dt = Math.min(0.1f, (now - last) / 1e9f);
         last = now;
@@ -50,32 +49,36 @@ public final class AnimButton {
         float al = enabled ? alpha : alpha * 0.45f;
 
         switch (style) {
-            case PRIMARY -> primary(c, tr, ry, al, false);
-            case BIG -> primary(c, tr, ry, al, true);
-            case SECONDARY -> {
+            case PRIMARY: primary(c, tr, ry, al, false); break;
+            case BIG: primary(c, tr, ry, al, true); break;
+            case SECONDARY: {
                 glassBase(c, ry, al, 5);
                 Ui.centered(c, tr, label, x + w / 2, ry + (h - 8) / 2, Anim.lerpColor(0xFFE2DEF5, Ui.TEXT, hover), al);
+                break;
             }
-            case PILL -> {
+            case PILL: {
                 glassBase(c, ry, al, h / 2);
                 Ui.centered(c, tr, label, x + w / 2, ry + (h - 8) / 2, Anim.lerpColor(0xFFCFCBE6, Ui.TEXT, hover), al);
+                break;
             }
-            case TILE -> {
+            case TILE: {
                 glassBase(c, ry, al, 6);
                 drawIcon(c, x + (w - 16) / 2, ry + 5, al);
                 Ui.centered(c, tr, label, x + w / 2, ry + h - 12, Anim.lerpColor(Ui.MUTED, Ui.TEXT, hover), al);
+                break;
             }
-            case GHOST -> {
+            case GHOST: {
                 int tw = tr.getWidth(label);
                 Ui.centered(c, tr, label, x + w / 2, ry + (h - 8) / 2, Anim.lerpColor(Ui.MUTED, Ui.TEXT, hover), al);
                 int uw = (int) (tw * Anim.easeInOutSine(hover));
                 if (uw > 1) Ui.hGradient(c, x + (w - uw) / 2, ry + (h + 8) / 2 + 2, uw, 1, Ui.a(Ui.ACCENT, al), Ui.a(Ui.CYAN, al));
+                break;
             }
-            case ROW -> row(c, tr, ry, al);
+            case ROW: row(c, tr, ry, al); break;
         }
     }
 
-    private void drawIcon(DrawContext c, int bx, int by, float al) {
+    private void drawIcon(Gfx c, int bx, int by, float al) {
         if (icon < 0 || icon >= ICONS.length) return;
         int ic = Ui.a(Anim.lerpColor(Ui.MUTED, Theme.light(Ui.ACCENT), hover), al);
         String[] rows = ICONS[icon];
@@ -85,14 +88,14 @@ public final class AnimButton {
     }
 
     /** Frosted base: faint white body, hairline rim that turns accent-coloured, soft halo on hover. */
-    private void glassBase(DrawContext c, int ry, float al, int r) {
+    private void glassBase(Gfx c, int ry, float al, int r) {
         float e = Anim.easeInOutSine(hover);
         if (e > 0.02f) Ui.rrect(c, x - 2, ry - 2, w + 4, h + 4, r + 2, Ui.a(Ui.ACCENT, 0.10f * e * al));
         Ui.rrect(c, x, ry, w, h, r, Ui.glass((0.07f + 0.07f * e) * al));
         Ui.rim(c, x, ry, w, h, r, Ui.a(Anim.lerpColor(0x33FFFFFF, Ui.ACCENT, e * 0.8f), al));
     }
 
-    private void primary(DrawContext c, TextRenderer tr, int ry, float al, boolean big) {
+    private void primary(Gfx c, TextRenderer tr, int ry, float al, boolean big) {
         float e = Anim.easeInOutSine(hover);
         int r = big ? 7 : 5;
         Ui.rrect(c, x - 3, ry - 3, w + 6, h + 6, r + 3, Ui.a(Ui.ACCENT, 0.09f * e * al));
@@ -109,7 +112,7 @@ public final class AnimButton {
     }
 
     /** The main menu line: a quiet row that gently lights up and slides when you point at it. */
-    private void row(DrawContext c, TextRenderer tr, int ry, float al) {
+    private void row(Gfx c, TextRenderer tr, int ry, float al) {
         float e = Anim.easeInOutSine(hover);
         if (e > 0.02f) {
             Ui.rrect(c, x - 4, ry - 1, w + 8, h + 2, 9, Ui.glass(0.07f * e * al));

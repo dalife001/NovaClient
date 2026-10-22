@@ -7,4 +7,4 @@ if [ ! -x ".gradle-dist/gradle-$V/bin/gradle" ]; then
   mkdir -p .gradle-dist
   curl -L -o gradle.zip "https://services.gradle.org/distributions/gradle-$V-bin.zip" && unzip -q gradle.zip -d .gradle-dist && rm gradle.zip
 fi
-".gradle-dist/gradle-$V/bin/gradle" build && echo "Done: $(pwd)/build/libs/novaclient-0.4.0.jar -> Launcher Settings > Local Nova jar"
+".gradle-dist/gradle-$V/bin/gradle" build && echo "Done: $(pwd)/build/libs/novaclient-*.jar (the one without -sources or -dev) -> Launcher Settings > Local Nova jar"

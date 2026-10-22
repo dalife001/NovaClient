@@ -1,22 +1,35 @@
 package com.nova.client.gui;
 
-import net.minecraft.client.gui.DrawContext;
+import com.nova.client.compat.Mc;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.sound.PositionedSoundInstance;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.widget.TextFieldWidget;
+//#if MC >= 2000
+import net.minecraft.client.gui.DrawContext;
+//#else
+import net.minecraft.client.util.math.MatrixStack;
+//#endif
+//#if MC >= 2109
+import net.minecraft.client.gui.Click;
+import net.minecraft.client.input.KeyInput;
+//#endif
 
 import java.util.ArrayList;
 import java.util.List;
 
-/** Base class: animated background, animated buttons, fade-in, toasts. */
+/**
+ * Base class: animated background, animated buttons, fade-in, toasts.
+ *
+ * Minecraft changed the Screen methods several times (drawing in 1.20, scrolling in 1.20.2, mouse and key events in 1.21.9,
+ * close/onClose in 1.18). This class is the only place that knows; the Nova screens override the n... hooks instead:
+ * nBackground, nRender, nClick, nDrag, nRelease, nScroll, nKey, nClose, pausesGame.
+ */
 public abstract class NovaScreen extends Screen {
     protected final Screen parent;
-    protected final List<AnimButton> buttons = new ArrayList<>();
+    protected final List<AnimButton> buttons = new ArrayList<AnimButton>();
     private final long opened = System.nanoTime();
 
     protected NovaScreen(String title, Screen parent) {
-        super(Text.literal(title));
+        super(Mc.text(title));
         this.parent = parent;
     }
 
@@ -29,12 +42,21 @@ public abstract class NovaScreen extends Screen {
         build();
     }
 
+    /** Throws away the widgets and builds them again (Screen.clearAndInit only exists in newer versions). */
+    protected void rebuild() {
+        //#if MC >= 1900
+        clearAndInit();
+        //#else
+        init(client, width, height);
+        //#endif
+    }
+
     /** Create buttons / text fields here. */
     protected abstract void build();
     /** Cards and panels, drawn underneath vanilla widgets like text fields. */
-    protected void drawBack(DrawContext ctx, int mx, int my, float delta) {}
+    protected void drawBack(Gfx ctx, int mx, int my, float delta) {}
     /** Text and extras, drawn on top. */
-    protected void drawFront(DrawContext ctx, int mx, int my, float delta) {}
+    protected void drawFront(Gfx ctx, int mx, int my, float delta) {}
 
     protected AnimButton button(int x, int y, int w, int h, String label, boolean primary, Runnable action) {
         AnimButton b = new AnimButton(x, y, w, h, label, primary ? AnimButton.Style.PRIMARY : AnimButton.Style.SECONDARY, action);
@@ -48,19 +70,44 @@ public abstract class NovaScreen extends Screen {
         return b;
     }
 
-    protected void click() {
-        client.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.UI_BUTTON_CLICK, 1.0f));
+    /** Adds a vanilla text box (1.16.5 calls this addButton, later versions addDrawableChild). */
+    protected void addField(TextFieldWidget f) {
+        //#if MC >= 1700
+        addDrawableChild(f);
+        //#else
+        addButton(f);
+        //#endif
     }
 
-    @Override
-    public void renderBackground(DrawContext ctx, int mx, int my, float delta) {
+    /** Moves a text box (the x / y fields became setters in 1.19.3). */
+    protected static void place(TextFieldWidget f, int x, int y) {
+        //#if MC >= 1903
+        f.setX(x);
+        f.setY(y);
+        //#else
+        f.x = x;
+        f.y = y;
+        //#endif
+    }
+
+    /** Grey hint text while the box is empty (the widget only supports this from 1.19.3). */
+    protected static void hint(TextFieldWidget f, String s) {
+        //#if MC >= 1903
+        f.setPlaceholder(Mc.text(s));
+        //#endif
+    }
+
+    protected void click() {
+        Mc.clickSound(client);
+    }
+
+    // ------------------------------------------------------------------ hooks for the Nova screens
+    protected void nBackground(Gfx ctx, int mx, int my, float delta) {
         Ui.background(ctx, width, height);
         drawBack(ctx, mx, my, delta);
     }
 
-    @Override
-    public void render(DrawContext ctx, int mx, int my, float delta) {
-        super.render(ctx, mx, my, delta); // background + vanilla widgets
+    protected void nRender(Gfx ctx, int mx, int my, float delta) {
         drawFront(ctx, mx, my, delta);
         for (AnimButton b : buttons) b.draw(ctx, textRenderer, mx, my, 1f, 0);
         Toasts.render(ctx, textRenderer, width, height);
@@ -68,8 +115,7 @@ public abstract class NovaScreen extends Screen {
         if (f > 0.02f) ctx.fill(0, 0, width, height, (((int) (f * 255f)) << 24) | 0x070716);
     }
 
-    @Override
-    public boolean mouseClicked(double mx, double my, int button) {
+    protected boolean nClick(double mx, double my, int button) {
         if (button == 0) {
             for (AnimButton b : buttons) {
                 if (b.hit(mx, my)) {
@@ -79,9 +125,144 @@ public abstract class NovaScreen extends Screen {
                 }
             }
         }
-        return super.mouseClicked(mx, my, button);
+        return vClick(mx, my, button);
+    }
+
+    protected boolean nDrag(double mx, double my, int button, double dx, double dy) { return vDrag(mx, my, button, dx, dy); }
+
+    protected boolean nRelease(double mx, double my, int button) { return vRelease(mx, my, button); }
+
+    protected boolean nScroll(double mx, double my, double h, double v) { return vScroll(mx, my, h, v); }
+
+    protected boolean nKey(int keyCode, int scanCode, int modifiers) { return vKey(keyCode, scanCode, modifiers); }
+
+    protected void nClose() { Mc.setScreen(client, parent); }
+
+    protected boolean pausesGame() { return true; }
+
+    // ------------------------------------------------------------------ bridge to the real Screen methods
+    //#if MC >= 2002
+    @Override
+    public void renderBackground(DrawContext ctx, int mx, int my, float delta) {
+        nBackground(new Gfx(ctx), mx, my, delta);
     }
 
     @Override
-    public void close() { client.setScreen(parent); }
+    public void render(DrawContext ctx, int mx, int my, float delta) {
+        super.render(ctx, mx, my, delta); // calls renderBackground, then the vanilla widgets
+        nRender(new Gfx(ctx), mx, my, delta);
+    }
+    //#elseif MC >= 2000
+    @Override
+    public void render(DrawContext ctx, int mx, int my, float delta) {
+        Gfx g = new Gfx(ctx);
+        nBackground(g, mx, my, delta);
+        super.render(ctx, mx, my, delta);
+        nRender(g, mx, my, delta);
+    }
+    //#else
+    @Override
+    public void render(MatrixStack ms, int mx, int my, float delta) {
+        Gfx g = new Gfx(ms);
+        nBackground(g, mx, my, delta);
+        super.render(ms, mx, my, delta);
+        nRender(g, mx, my, delta);
+    }
+    //#endif
+
+    //#if MC >= 1802
+    @Override
+    public void close() { nClose(); }
+    //#else
+    @Override
+    public void onClose() { nClose(); }
+    //#endif
+
+    //#if MC >= 1801
+    @Override
+    public boolean shouldPause() { return pausesGame(); }
+    //#else
+    @Override
+    public boolean isPauseScreen() { return pausesGame(); }
+    //#endif
+
+    //#if MC >= 2109
+    private Click lastClick;
+    private boolean lastDouble;
+    private KeyInput lastKey;
+
+    private static double mouseX() {
+        net.minecraft.client.MinecraftClient c = net.minecraft.client.MinecraftClient.getInstance();
+        return c.mouse.getX() * c.getWindow().getScaledWidth() / (double) Math.max(1, c.getWindow().getWidth());
+    }
+
+    private static double mouseY() {
+        net.minecraft.client.MinecraftClient c = net.minecraft.client.MinecraftClient.getInstance();
+        return c.mouse.getY() * c.getWindow().getScaledHeight() / (double) Math.max(1, c.getWindow().getHeight());
+    }
+
+    @Override
+    public boolean mouseClicked(Click c, boolean doubled) {
+        lastClick = c; lastDouble = doubled;
+        return nClick(mouseX(), mouseY(), c.button());
+    }
+
+    @Override
+    public boolean mouseDragged(Click c, double dx, double dy) {
+        lastClick = c;
+        return nDrag(mouseX(), mouseY(), c.button(), dx, dy);
+    }
+
+    @Override
+    public boolean mouseReleased(Click c) {
+        lastClick = c;
+        return nRelease(mouseX(), mouseY(), c.button());
+    }
+
+    @Override
+    public boolean keyPressed(KeyInput k) {
+        lastKey = k;
+        return nKey(k.getKeycode(), 0, 0);
+    }
+
+    protected boolean vClick(double mx, double my, int button) { return lastClick != null && super.mouseClicked(lastClick, lastDouble); }
+
+    protected boolean vDrag(double mx, double my, int button, double dx, double dy) { return lastClick != null && super.mouseDragged(lastClick, dx, dy); }
+
+    protected boolean vRelease(double mx, double my, int button) { return lastClick != null && super.mouseReleased(lastClick); }
+
+    protected boolean vKey(int keyCode, int scanCode, int modifiers) { return lastKey != null && super.keyPressed(lastKey); }
+    //#else
+    @Override
+    public boolean mouseClicked(double mx, double my, int button) { return nClick(mx, my, button); }
+
+    @Override
+    public boolean mouseDragged(double mx, double my, int button, double dx, double dy) { return nDrag(mx, my, button, dx, dy); }
+
+    @Override
+    public boolean mouseReleased(double mx, double my, int button) { return nRelease(mx, my, button); }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) { return nKey(keyCode, scanCode, modifiers); }
+
+    protected boolean vClick(double mx, double my, int button) { return super.mouseClicked(mx, my, button); }
+
+    protected boolean vDrag(double mx, double my, int button, double dx, double dy) { return super.mouseDragged(mx, my, button, dx, dy); }
+
+    protected boolean vRelease(double mx, double my, int button) { return super.mouseReleased(mx, my, button); }
+
+    protected boolean vKey(int keyCode, int scanCode, int modifiers) { return super.keyPressed(keyCode, scanCode, modifiers); }
+    //#endif
+
+    //#if MC >= 2002
+    @Override
+    public boolean mouseScrolled(double mx, double my, double h, double v) { return nScroll(mx, my, h, v); }
+
+    protected boolean vScroll(double mx, double my, double h, double v) { return super.mouseScrolled(mx, my, h, v); }
+    //#else
+    @Override
+    public boolean mouseScrolled(double mx, double my, double amount) { return nScroll(mx, my, 0, amount); }
+
+    protected boolean vScroll(double mx, double my, double h, double v) { return super.mouseScrolled(mx, my, v); }
+    //#endif
 }

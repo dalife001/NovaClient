@@ -2,36 +2,66 @@ package com.nova.client.account;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.nova.client.util.Net;
+import com.nova.client.util.S;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * Microsoft -> Xbox Live -> XSTS -> Minecraft login using the OAuth "device code" flow.
  * You never type your password into Nova Client: you log in on microsoft.com.
  */
 public final class MicrosoftAuth {
-    private static final HttpClient HTTP = HttpClient.newHttpClient();
     private static final String SCOPE = "XboxLive.signin offline_access";
     private static final String TENANT = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
 
-    public record DeviceCode(String deviceCode, String userCode, String verificationUri, int interval, int expiresIn) {}
-    public record MsTokens(String accessToken, String refreshToken) {}
-    public record McProfile(String name, UUID uuid, String mcToken) {}
+    private MicrosoftAuth() {}
+
+    public static final class DeviceCode {
+        private final String deviceCode, userCode, verificationUri;
+        private final int interval, expiresIn;
+
+        DeviceCode(String deviceCode, String userCode, String verificationUri, int interval, int expiresIn) {
+            this.deviceCode = deviceCode; this.userCode = userCode; this.verificationUri = verificationUri;
+            this.interval = interval; this.expiresIn = expiresIn;
+        }
+
+        public String deviceCode() { return deviceCode; }
+        public String userCode() { return userCode; }
+        public String verificationUri() { return verificationUri; }
+        public int interval() { return interval; }
+        public int expiresIn() { return expiresIn; }
+    }
+
+    public static final class MsTokens {
+        private final String accessToken, refreshToken;
+
+        MsTokens(String accessToken, String refreshToken) { this.accessToken = accessToken; this.refreshToken = refreshToken; }
+
+        public String accessToken() { return accessToken; }
+        public String refreshToken() { return refreshToken; }
+    }
+
+    public static final class McProfile {
+        private final String name, mcToken;
+        private final UUID uuid;
+
+        McProfile(String name, UUID uuid, String mcToken) { this.name = name; this.uuid = uuid; this.mcToken = mcToken; }
+
+        public String name() { return name; }
+        public UUID uuid() { return uuid; }
+        public String mcToken() { return mcToken; }
+    }
 
     // ----- step 1: device code -----
     public static DeviceCode requestDeviceCode(String clientId) throws Exception {
-        JsonObject o = send(form(TENANT + "/devicecode", Map.of("client_id", clientId, "scope", SCOPE)));
+        Map<String, String> f = new LinkedHashMap<String, String>();
+        f.put("client_id", clientId);
+        f.put("scope", SCOPE);
+        JsonObject o = send(Net.postForm(TENANT + "/devicecode", f));
         if (!o.has("device_code")) throw new IOException(err(o));
         return new DeviceCode(o.get("device_code").getAsString(), o.get("user_code").getAsString(),
                 o.get("verification_uri").getAsString(), o.get("interval").getAsInt(), o.get("expires_in").getAsInt());
@@ -42,11 +72,11 @@ public final class MicrosoftAuth {
         long deadline = System.currentTimeMillis() + dc.expiresIn() * 1000L;
         while (System.currentTimeMillis() < deadline) {
             Thread.sleep(Math.max(dc.interval(), 2) * 1000L);
-            Map<String, String> f = new LinkedHashMap<>();
+            Map<String, String> f = new LinkedHashMap<String, String>();
             f.put("grant_type", "urn:ietf:params:oauth:grant-type:device_code");
             f.put("client_id", clientId);
             f.put("device_code", dc.deviceCode());
-            JsonObject o = send(form(TENANT + "/token", f));
+            JsonObject o = send(Net.postForm(TENANT + "/token", f));
             if (o.has("access_token")) return tokens(o);
             String e = o.has("error") ? o.get("error").getAsString() : "";
             if (!e.equals("authorization_pending") && !e.equals("slow_down")) throw new IOException(err(o));
@@ -55,12 +85,12 @@ public final class MicrosoftAuth {
     }
 
     public static MsTokens refresh(String clientId, String refreshToken) throws Exception {
-        Map<String, String> f = new LinkedHashMap<>();
+        Map<String, String> f = new LinkedHashMap<String, String>();
         f.put("grant_type", "refresh_token");
         f.put("client_id", clientId);
         f.put("refresh_token", refreshToken);
         f.put("scope", SCOPE);
-        JsonObject o = send(form(TENANT + "/token", f));
+        JsonObject o = send(Net.postForm(TENANT + "/token", f));
         if (!o.has("access_token")) throw new IOException(err(o));
         return tokens(o);
     }
@@ -80,14 +110,14 @@ public final class MicrosoftAuth {
         xblBody.add("Properties", xblProps);
         xblBody.addProperty("RelyingParty", "http://auth.xboxlive.com");
         xblBody.addProperty("TokenType", "JWT");
-        JsonObject xbl = send(json("https://user.auth.xboxlive.com/user/authenticate", xblBody, null));
+        JsonObject xbl = send(Net.postJson("https://user.auth.xboxlive.com/user/authenticate", xblBody.toString()));
         if (!xbl.has("Token")) throw new IOException("Xbox Live login failed");
         String xblToken = xbl.get("Token").getAsString();
         String uhs = xbl.getAsJsonObject("DisplayClaims").getAsJsonArray("xui").get(0)
                 .getAsJsonObject().get("uhs").getAsString();
 
         JsonArray userTokens = new JsonArray();
-        userTokens.add(xblToken);
+        userTokens.add(new com.google.gson.JsonPrimitive(xblToken));
         JsonObject xstsProps = new JsonObject();
         xstsProps.addProperty("SandboxId", "RETAIL");
         xstsProps.add("UserTokens", userTokens);
@@ -95,54 +125,33 @@ public final class MicrosoftAuth {
         xstsBody.add("Properties", xstsProps);
         xstsBody.addProperty("RelyingParty", "rp://api.minecraftservices.com/");
         xstsBody.addProperty("TokenType", "JWT");
-        JsonObject xsts = send(json("https://xsts.auth.xboxlive.com/xsts/authorize", xstsBody, null));
+        JsonObject xsts = send(Net.postJson("https://xsts.auth.xboxlive.com/xsts/authorize", xstsBody.toString()));
         if (!xsts.has("Token")) throw new IOException("XSTS failed (does this account have an Xbox profile / is it a child account?)");
 
         JsonObject mcBody = new JsonObject();
         mcBody.addProperty("identityToken", "XBL3.0 x=" + uhs + ";" + xsts.get("Token").getAsString());
-        JsonObject mc = send(json("https://api.minecraftservices.com/authentication/login_with_xbox", mcBody, null));
+        JsonObject mc = send(Net.postJson("https://api.minecraftservices.com/authentication/login_with_xbox", mcBody.toString()));
         if (!mc.has("access_token")) {
             throw new IOException("Minecraft login refused: " + err(mc)
                     + " (new Azure apps must be approved by Mojang, see README)");
         }
         String mcToken = mc.get("access_token").getAsString();
 
-        HttpRequest prof = HttpRequest.newBuilder(URI.create("https://api.minecraftservices.com/minecraft/profile"))
-                .header("Authorization", "Bearer " + mcToken).GET().build();
-        JsonObject p = send(prof);
+        JsonObject p = send(Net.getAuth("https://api.minecraftservices.com/minecraft/profile", mcToken));
         if (!p.has("id")) throw new IOException("This account does not own Minecraft: Java Edition");
         UUID uuid = UUID.fromString(p.get("id").getAsString().replaceFirst(
                 "(\\p{XDigit}{8})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}+)", "$1-$2-$3-$4-$5"));
         return new McProfile(p.get("name").getAsString(), uuid, mcToken);
     }
 
-    // ----- http helpers -----
-    public static JsonObject send(HttpRequest req) throws IOException, InterruptedException {
-        HttpResponse<String> r = HTTP.send(req, HttpResponse.BodyHandlers.ofString());
+    // ----- helpers -----
+    /** Parses a JSON object body (if there is one) and adds "_status" with the HTTP status code. */
+    public static JsonObject send(Net.Response r) {
         JsonObject o = new JsonObject();
         String body = r.body();
-        if (body != null && !body.isBlank() && body.trim().startsWith("{")) {
-            o = JsonParser.parseString(body).getAsJsonObject();
-        }
-        o.addProperty("_status", r.statusCode());
+        if (body != null && !S.blank(body) && body.trim().startsWith("{")) o = S.parseObject(body);
+        o.addProperty("_status", r.status);
         return o;
-    }
-
-    private static HttpRequest form(String url, Map<String, String> fields) {
-        String body = fields.entrySet().stream()
-                .map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8) + "="
-                        + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
-                .collect(Collectors.joining("&"));
-        return HttpRequest.newBuilder(URI.create(url))
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .POST(HttpRequest.BodyPublishers.ofString(body)).build();
-    }
-
-    private static HttpRequest json(String url, JsonObject body, String bearer) {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url))
-                .header("Content-Type", "application/json").header("Accept", "application/json");
-        if (bearer != null) b.header("Authorization", "Bearer " + bearer);
-        return b.POST(HttpRequest.BodyPublishers.ofString(body.toString())).build();
     }
 
     private static String err(JsonObject o) {

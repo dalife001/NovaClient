@@ -1,52 +1,155 @@
-# Push a tag like v0.3.1 and everything below happens automatically:
-# builds the mod + launcher, writes latest.json, publishes a GitHub Release.
-# Players' launchers read latest.json and update themselves on the next Play.
+# Builds Nova Client for EVERY Minecraft version Fabric + Yarn support (1.16.5 and newer) and publishes one release.
+#
+#   - push a tag like v0.7.0        -> builds + publishes that release
+#   - every Monday (schedule)       -> rebuilds the latest tag, which picks up newly released Minecraft versions
+#   - Actions tab > Run workflow    -> same, and you can limit it to a few versions
+#
+# A version whose code does not compile yet is simply left out (see the job summary); everything else ships.
+# Players' launchers read latest.json, look up the build for the Minecraft version they picked, and download it.
 name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      only_mc:
+        description: 'Only build these Minecraft versions (comma separated, blank = all)'
+        required: false
+        default: ''
+  schedule:
+    - cron: '0 5 * * 1'
 permissions:
   contents: write
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
-  release:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.ver.outputs.tag }}
+      version: ${{ steps.ver.outputs.version }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: ver
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then TAG="$GITHUB_REF_NAME"; else TAG=$(git tag --list 'v*' --sort=-v:refname | head -1); fi
+          [ -n "$TAG" ] || { echo "No v* tag yet. Push one first, for example: git tag v0.7.0 && git push --tags"; exit 1; }
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+      - name: Use the code of that tag
+        run: git checkout "${{ steps.ver.outputs.tag }}"
+      - id: matrix
+        env:
+          ONLY_MC: ${{ github.event.inputs.only_mc }}
+        run: python3 tools/ci/discover.py
+
+  build:
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.tag }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.jdk }}
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.14.3
+      - name: Build Nova for Minecraft ${{ matrix.mc }}
+        id: build
+        continue-on-error: true
+        working-directory: NovaClient
+        run: |
+          set -o pipefail
+          gradle build --stacktrace --no-daemon \
+            -Pmod_version='${{ needs.plan.outputs.version }}' \
+            -Pminecraft_version='${{ matrix.mc }}' \
+            -Pyarn_mappings='${{ matrix.yarn }}' \
+            -Pfabric_version='${{ matrix.fabric_api }}' \
+            -Pjava_version='${{ matrix.java }}' \
+            -Ploom_version='${{ matrix.loom }}' \
+            -Pstrict_mixins='${{ matrix.tested }}' 2>&1 | tee build.log
+      - name: Keep the build log of a failed version
+        if: steps.build.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: FAILED-log-${{ matrix.mc }}
+          path: NovaClient/build.log
+      - name: Keep the jar
+        if: steps.build.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.mc }}
+          path: NovaClient/build/libs/novaclient-${{ needs.plan.outputs.version }}.jar
+          if-no-files-found: error
+      - name: Note in the summary
+        run: |
+          if [ "${{ steps.build.outcome }}" = "success" ]; then
+            echo "- OK        ${{ matrix.mc }}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- FAILED    ${{ matrix.mc }}  (download the artifact FAILED-log-${{ matrix.mc }} and send it to whoever maintains the code)" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            grep -E "error:|FAILURE|What went wrong|Could not|not found" NovaClient/build.log | head -8 >> "$GITHUB_STEP_SUMMARY" || true
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  launcher:
+    needs: plan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.tag }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
-      - uses: gradle/actions/setup-gradle@v4
-
-      - name: Build mod
-        working-directory: NovaClient
-        run: gradle build -Pmod_version=${GITHUB_REF_NAME#v}
-
       - name: Build launcher
         working-directory: NovaLauncher
         run: ./build.sh
+      - name: Self test
+        working-directory: NovaLauncher
+        run: java -cp NovaLauncher.jar com.nova.launcher.SelfTest
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher
+          path: NovaLauncher/NovaLauncher.jar
 
+  publish:
+    needs: [plan, build, launcher]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.launcher.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.tag }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: build-*
+          path: builds
+      - uses: actions/download-artifact@v4
+        with:
+          name: launcher
+          path: release
       - name: Write latest.json
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          MC=$(grep '^minecraft_version=' NovaClient/gradle.properties | cut -d= -f2)
           LAUNCHER=$(sed -n 's/.*VERSION = "\(.*\)";/\1/p' NovaLauncher/src/com/nova/launcher/GameLauncher.java)
-          JAR=NovaClient/build/libs/novaclient-$VERSION.jar
-          SHA=$(sha256sum "$JAR" | cut -d' ' -f1)
-          BASE=https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}
-          cat > latest.json <<JSON
-          {
-            "version": "$VERSION",
-            "minecraft": "$MC",
-            "mod": { "url": "$BASE/novaclient-$VERSION.jar", "sha256": "$SHA" },
-            "launcher": { "version": "$LAUNCHER", "url": "$BASE/NovaLauncher.jar" }
-          }
-          JSON
-          cat latest.json
-
+          BASE="https://github.com/${{ github.repository }}/releases/download/${{ needs.plan.outputs.tag }}"
+          python3 tools/ci/make_manifest.py builds release "${{ needs.plan.outputs.version }}" "$BASE" "$LAUNCHER" tools/tested-versions.txt
+          cat release/latest.json
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.plan.outputs.tag }}
           files: |
-            NovaClient/build/libs/novaclient-*.jar
-            NovaLauncher/NovaLauncher.jar
-            latest.json
+            release/*.jar
+            release/latest.json

@@ -1,14 +1,10 @@
 package com.nova.client;
 
+import com.nova.client.util.S;
+import com.nova.client.util.Net;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.nova.client.config.Config;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 
 /** Looks at latest.json and remembers the newest Nova Client version. The Nova Launcher installs it. */
 public final class UpdateChecker {
@@ -30,15 +26,11 @@ public final class UpdateChecker {
 
     public static void check() {
         String url = Config.get().manifestUrl();
-        if (url.isBlank()) { note = "No update URL set"; return; }
+        if (S.blank(url)) { note = "No update URL set"; return; }
         note = "Checking...";
         Thread t = new Thread(() -> {
             try {
-                HttpClient c = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL)
-                        .connectTimeout(Duration.ofSeconds(10)).build();
-                HttpResponse<String> r = c.send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(15)).build(),
-                        HttpResponse.BodyHandlers.ofString());
-                JsonObject o = JsonParser.parseString(r.body()).getAsJsonObject();
+                JsonObject o = S.parseObject(Net.get(url).body());
                 latest = o.get("version").getAsString();
                 note = available() ? "Update available: " + latest : "You are up to date";
             } catch (Exception e) {

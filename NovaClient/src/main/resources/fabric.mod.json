@@ -3,14 +3,14 @@
   "id": "novaclient",
   "version": "${version}",
   "name": "Nova Client",
-  "description": "Custom Minecraft client: main menu, accounts, skins, friends, freecam, with Sodium and Iris built in.",
+  "description": "Custom Minecraft client: main menu, accounts, skins, friends, HUD modules, zoom and more. Sodium, Iris and Freecam are optional and chosen in the Nova Launcher.",
   "environment": "client",
   "entrypoints": { "client": ["com.nova.client.NovaClient"] },
   "mixins": ["novaclient.mixins.json"],
   "depends": {
     "fabricloader": ">=0.16.0",
-    "minecraft": "~1.21.4",
-    "java": ">=21",
+    "minecraft": "${minecraft_version}",
+    "java": ">=${java_version}",
     "fabric-api": "*"
   }
 }

@@ -1,8 +1,9 @@
 package com.nova.client.module;
 
+import com.nova.client.compat.Mc;
+import com.nova.client.gui.Gfx;
 import com.nova.client.gui.Anim;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.option.GameOptions;
 
 import static com.nova.client.gui.Ui.round;
@@ -18,13 +19,13 @@ public class KeystrokesModule extends HudModule {
     @Override protected int contentH(MinecraftClient mc) { return 68; }
 
     @Override
-    protected void draw(DrawContext ctx, MinecraftClient mc) {
+    protected void draw(Gfx ctx, MinecraftClient mc) {
         long now = System.nanoTime();
         float dt = Math.min(0.1f, (now - last) / 1e9f);
         last = now;
         GameOptions o = mc.options;
-        boolean[] p = {o.forwardKey.isPressed(), o.leftKey.isPressed(), o.backKey.isPressed(), o.rightKey.isPressed(),
-                o.attackKey.isPressed(), o.useKey.isPressed(), o.jumpKey.isPressed()};
+        boolean[] p = {Mc.forward(o).isPressed(), Mc.left(o).isPressed(), Mc.back(o).isPressed(), Mc.right(o).isPressed(),
+                Mc.attack(o).isPressed(), Mc.use(o).isPressed(), Mc.jump(o).isPressed()};
         for (int i = 0; i < a.length; i++) a[i] = Anim.approach(a[i], p[i] ? 1f : 0f, dt, 22f);
 
         key(ctx, mc, "W", 20, 0, 18, 18, a[0]);
@@ -36,7 +37,7 @@ public class KeystrokesModule extends HudModule {
         key(ctx, mc, "", 0, 58, 58, 10, a[6]);
     }
 
-    private void key(DrawContext ctx, MinecraftClient mc, String label, int x, int y, int w, int h, float t) {
+    private void key(Gfx ctx, MinecraftClient mc, String label, int x, int y, int w, int h, float t) {
         round(ctx, x, y, w, h, Anim.lerpColor(0x8A0C0A1E, com.nova.client.gui.Ui.a(com.nova.client.gui.Ui.ACCENT, 0.92f), t));
         if (label.isEmpty()) {
             ctx.fill(x + 14, y + 4, x + w - 14, y + 6, Anim.lerpColor(0xFFA9A6C4, 0xFF1A1433, t));

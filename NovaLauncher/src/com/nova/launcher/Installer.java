@@ -1,10 +1,14 @@
 package com.nova.launcher;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 /** Downloads Minecraft (from Mojang) and Fabric Loader, and works out how to start them. */
 final class Installer {
@@ -14,6 +18,9 @@ final class Installer {
 
     record Plan(String mainClass, List<Path> classpath, List<String> jvm, List<String> game,
                 String assetIndex, Path assetsDir, String versionId, Path natives, int javaMajor) {}
+
+    /** An old-style native library: a jar whose contents (dll/so/dylib) must be unpacked into the natives folder. */
+    record NativeJar(Path jar, List<String> exclude) {}
 
     private final Path root;
     private final Progress p;
@@ -57,10 +64,25 @@ final class Installer {
             jobs.add(new Http.Job(base + path, dest, "SHA-1", Json.str(lib, "sha1"), 0));
             classpath.putIfAbsent(dedupeKey(path), dest);
         }
+        List<NativeJar> nativeJars = new ArrayList<>();
         for (Object o : Json.a(vj.get("libraries"))) {
             Map<String, Object> lib = Json.o(o);
             if (!Rules.allowed(Json.a(lib.get("rules")))) continue;
-            Map<String, Object> art = Json.o(Json.o(lib.get("downloads")).get("artifact"));
+            Map<String, Object> dl = Json.o(lib.get("downloads"));
+            // Minecraft 1.14 - 1.18 style: natives come as a classifier jar that has to be unpacked
+            String cls = nativeClassifier(lib);
+            if (cls != null) {
+                Map<String, Object> n = Json.o(Json.o(dl.get("classifiers")).get(cls));
+                String npath = Json.str(n, "path");
+                if (npath != null) {
+                    Path ndest = libs.resolve(npath);
+                    jobs.add(new Http.Job(Json.str(n, "url"), ndest, "SHA-1", Json.str(n, "sha1"), Json.num(n, "size")));
+                    List<String> ex = new ArrayList<>();
+                    for (Object x : Json.a(Json.o(lib.get("extract")).get("exclude"))) ex.add(String.valueOf(x));
+                    nativeJars.add(new NativeJar(ndest, ex));
+                }
+            }
+            Map<String, Object> art = Json.o(dl.get("artifact"));
             String path = Json.str(art, "path");
             if (path == null) continue;
             Path dest = libs.resolve(path);
@@ -84,28 +106,42 @@ final class Installer {
             jobs.add(new Http.Job(ASSET_HOST + sub, assets.resolve("objects").resolve(h.substring(0, 2)).resolve(h), "SHA-1", h, Json.num(obj, "size")));
         }
 
+        // ---- log4j config (older versions need Mojang's patched one) ----
+        String logArg = null;
+        Map<String, Object> logging = Json.o(Json.o(vj.get("logging")).get("client"));
+        Map<String, Object> lf = Json.o(logging.get("file"));
+        if (Json.str(lf, "url") != null && Json.str(lf, "id") != null && Json.str(logging, "argument") != null) {
+            Path lp = assets.resolve("log_configs").resolve(Json.str(lf, "id"));
+            jobs.add(new Http.Job(Json.str(lf, "url"), lp, "SHA-1", Json.str(lf, "sha1"), Json.num(lf, "size")));
+            logArg = Json.str(logging, "argument").replace("${path}", lp.toString());
+        }
+
         p.status("Checking game files...");
         Http.all(jobs, p, "Downloading game files");
+
+        Path natives = vdir.resolve("natives");
+        Files.createDirectories(natives);
+        for (NativeJar nj : nativeJars) extractNatives(nj.jar(), natives, nj.exclude());
 
         // ---- launch arguments ----
         Map<String, Object> vArgs = Json.o(vj.get("arguments"));
         Map<String, Object> fArgs = Json.o(fabric.get("arguments"));
         List<String> jvm = new ArrayList<>(Rules.resolveArgs(Json.a(vArgs.get("jvm"))));
         jvm.addAll(Rules.resolveArgs(Json.a(fArgs.get("jvm"))));
+        if (jvm.stream().noneMatch(a -> a.contains("java.library.path"))) jvm.add("-Djava.library.path=${natives_directory}");
+        if (logArg != null) jvm.add(logArg);
         List<String> game = new ArrayList<>(Rules.resolveArgs(Json.a(vArgs.get("game"))));
         game.addAll(Rules.resolveArgs(Json.a(fArgs.get("game"))));
         if (vArgs.isEmpty() && vj.get("minecraftArguments") instanceof String legacy) {
             game.addAll(Arrays.asList(legacy.split(" ")));
         }
 
-        Path natives = vdir.resolve("natives");
-        Files.createDirectories(natives);
         int java = (int) Json.num(Json.o(vj.get("javaVersion")), "majorVersion");
         String main = Json.str(fabric, "mainClass");
         if (main == null) main = Json.str(vj, "mainClass");
 
         p.status("Game files ready");
-        return new Plan(main, cp, jvm, game, aiId, assets, mc, natives, java == 0 ? 21 : java);
+        return new Plan(main, cp, jvm, game, aiId, assets, mc, natives, java == 0 ? 8 : java);
     }
 
     Map<String, Object> fabricProfile(String mc) throws Exception {
@@ -129,6 +165,34 @@ final class Installer {
             body = Files.readString(cache); // offline: reuse
         }
         return Json.o(Json.parse(body));
+    }
+
+    /** Classifier name (like natives-windows) for this computer, or null if the library has no old-style natives. */
+    static String nativeClassifier(Map<String, Object> lib) {
+        Map<String, Object> nat = Json.o(lib.get("natives"));
+        String cls = nat.isEmpty() ? null : Json.str(nat, Platform.os());
+        return cls == null ? null : cls.replace("${arch}", Platform.is32bit() ? "32" : "64");
+    }
+
+    static boolean excluded(String entry, List<String> exclude) {
+        for (String x : exclude) if (entry.startsWith(x)) return true;
+        return false;
+    }
+
+    /** Unpacks the native libraries from a jar into the natives folder. */
+    static void extractNatives(Path jar, Path dest, List<String> exclude) throws IOException {
+        Path base = dest.toAbsolutePath().normalize();
+        try (ZipFile z = new ZipFile(jar.toFile())) {
+            for (var en = z.entries(); en.hasMoreElements(); ) {
+                ZipEntry e = en.nextElement();
+                if (e.isDirectory() || excluded(e.getName(), exclude)) continue;
+                Path out = base.resolve(e.getName()).normalize();
+                if (!out.startsWith(base)) continue;                    // never write outside the natives folder
+                if (Files.isRegularFile(out) && Files.size(out) == e.getSize()) continue;
+                Files.createDirectories(out.getParent());
+                try (InputStream in = z.getInputStream(e)) { Files.copy(in, out, StandardCopyOption.REPLACE_EXISTING); }
+            }
+        }
     }
 
     // ----- helpers (package-private for tests) -----

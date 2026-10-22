@@ -1,7 +1,8 @@
 package com.nova.client.module;
 
+import com.nova.client.compat.Mc;
+import com.nova.client.gui.Gfx;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
 import net.minecraft.entity.effect.StatusEffectInstance;
 
 import java.util.ArrayList;
@@ -20,9 +21,9 @@ public class PotionHudModule extends HudModule {
         if (mc.player == null) return out;
         Collection<StatusEffectInstance> effects = mc.player.getStatusEffects();
         for (StatusEffectInstance e : effects) {
-            String name = e.getEffectType().value().getName().getString();
+            String name = Mc.effectName(e);
             String lvl = e.getAmplifier() > 0 ? " " + (e.getAmplifier() + 1) : "";
-            String time = e.isInfinite() ? "\u221E" : String.format("%d:%02d", e.getDuration() / 1200, (e.getDuration() / 20) % 60);
+            String time = e.getDuration() < 0 ? "\u221E" : String.format("%d:%02d", e.getDuration() / 1200, (e.getDuration() / 20) % 60);
             out.add(new String[]{name + lvl, time});
         }
         return out;
@@ -36,7 +37,7 @@ public class PotionHudModule extends HudModule {
     @Override protected int contentH(MinecraftClient mc) { return Hud.TITLE_H + Math.max(1, lines(mc).size()) * 11 + 5; }
 
     @Override
-    protected void draw(DrawContext ctx, MinecraftClient mc) {
+    protected void draw(Gfx ctx, MinecraftClient mc) {
         int w = contentW(mc);
         Hud.titled(ctx, mc, 0, 0, w, contentH(mc), TITLE);
         List<String[]> l = lines(mc);

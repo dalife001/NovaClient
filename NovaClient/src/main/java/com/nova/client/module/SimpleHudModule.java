@@ -1,7 +1,7 @@
 package com.nova.client.module;
 
+import com.nova.client.gui.Gfx;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
 
 /** A one-line "LABEL value" pill. */
 public abstract class SimpleHudModule extends HudModule {
@@ -19,7 +19,7 @@ public abstract class SimpleHudModule extends HudModule {
     @Override protected int contentH(MinecraftClient mc) { return 16; }
 
     @Override
-    protected void draw(DrawContext ctx, MinecraftClient mc) {
+    protected void draw(Gfx ctx, MinecraftClient mc) {
         Hud.panel(ctx, 0, 0, contentW(mc), 16);
         ctx.drawTextWithShadow(mc.textRenderer, label(), 7, 4, 0xFF9CA3AF);
         ctx.drawTextWithShadow(mc.textRenderer, value(mc), 7 + mc.textRenderer.getWidth(label()) + 5, 4, valueColor(mc));

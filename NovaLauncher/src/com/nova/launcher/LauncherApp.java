@@ -17,60 +17,43 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 /** The Nova Launcher window (v2 design: sidebar, hero card, profile rows, status column). */
 public final class LauncherApp {
-    // ---- palette
-    static final Color BG = new Color(0x0A0A10), SURFACE = new Color(0x13131C), SURFACE2 = new Color(0x1B1B27);
-    static final Color BORDER = new Color(255, 255, 255, 22);
-    static Color ACCENT = new Color(0x8B5CF6), ACCENT_DARK = new Color(0x5B34B8), CYAN = new Color(0x22D3EE);
-    static final String[] THEME_NAMES = {"Nova", "Ocean", "Sunset", "Emerald", "Rose"};
-    private static final int[][] THEMES = {{0x8B5CF6, 0x5B34B8, 0x22D3EE}, {0x3B82F6, 0x1D4ED8, 0x2DD4BF}, {0xF97316, 0xC2410C, 0xF472B6},
-            {0x10B981, 0x047857, 0xA3E635}, {0xF43F5E, 0x9F1239, 0xFBBF24}};
+    // ---- palette (the same night-sky palettes as the in-game client's Theme)
+    static final Color BG = new Color(0x080816), SURFACE = new Color(0x15122B), SURFACE2 = new Color(0x221E42);
+    static final Color BORDER = new Color(182, 156, 255, 46);
+    static Color ACCENT = new Color(0xB69CFF), ACCENT_DARK = new Color(0x6C5BD0), CYAN = new Color(0xFFC2A8);   // CYAN = warm secondary
+    static Color SKY_TOP = new Color(0x080818), SKY_BOT = new Color(0x352766);
+    static Color AUR1 = new Color(0x7CF5D0), AUR2 = new Color(0xB69CFF), AUR3 = new Color(0xFF9EC7);
+    static final String[] THEME_NAMES = {"Twilight", "Lagoon", "Dusk", "Meadow", "Blossom"};
+    // accent, accent deep, secondary, sky top, sky bottom, aurora 1..3
+    private static final int[][] THEMES = {
+            {0xB69CFF, 0x6C5BD0, 0xFFC2A8, 0x080818, 0x352766, 0x7CF5D0, 0xB69CFF, 0xFF9EC7},
+            {0x7CC8FF, 0x2F6FB5, 0x8FF0D4, 0x050F1E, 0x164766, 0x5FF2C8, 0x7CC8FF, 0xA99BFF},
+            {0xFFA98A, 0xC4577A, 0xFFD58A, 0x110818, 0x6E2F4C, 0xFFB28A, 0xFF8FB1, 0xFFD58A},
+            {0x9BE8B0, 0x3E8F6B, 0xE3F59A, 0x05120D, 0x1B5240, 0x8EF0B0, 0xD2F59A, 0x5FD6C8},
+            {0xFF9EC4, 0xB6487C, 0xC9B4FF, 0x150818, 0x5E2A66, 0xFF9EC4, 0xC9B4FF, 0xFFC2A8}};
     static int themeIndex;
 
-    /** Switches the accent palette of the whole launcher (takes effect on next repaint). */
+    /** Switches the palette of the whole launcher (takes effect on next repaint). */
     static void applyTheme(int i) {
         themeIndex = Math.max(0, Math.min(THEMES.length - 1, i));
-        ACCENT = new Color(THEMES[themeIndex][0]); ACCENT_DARK = new Color(THEMES[themeIndex][1]); CYAN = new Color(THEMES[themeIndex][2]);
+        int[] t = THEMES[themeIndex];
+        ACCENT = new Color(t[0]); ACCENT_DARK = new Color(t[1]); CYAN = new Color(t[2]);
+        SKY_TOP = new Color(t[3]); SKY_BOT = new Color(t[4]);
+        AUR1 = new Color(t[5]); AUR2 = new Color(t[6]); AUR3 = new Color(t[7]);
     }
 
     static Color mix(Color a, Color b, float t) {
         return new Color(Math.round(a.getRed() + (b.getRed() - a.getRed()) * t), Math.round(a.getGreen() + (b.getGreen() - a.getGreen()) * t),
                 Math.round(a.getBlue() + (b.getBlue() - a.getBlue()) * t));
     }
-    static final Color TEXT = Color.WHITE, MUTED = new Color(0x9CA3AF), DIM = new Color(0x6B7280);
-    static final Color GREEN = new Color(0x34D399), GREEN_BTN = new Color(0x22C55E), GREEN_DARK = new Color(0x15803D), RED = new Color(0xF87171);
-
-    private final LauncherConfig cfg = LauncherConfig.load();
-    private final Path home = Platform.home();
-    private final Path gameDir = home.resolve("instances").resolve("default");
-
-    private JFrame frame;
-    private JPanel root;
-    private CardLayout pages;
-    private JPanel pageHost;
-    private Hero hero;
-    private SkinPanel skinPanel;
-    private PlayButton playButton;
-    private NovaButton loginButton;
-    private JLabel status, who, subtitle, hint, chipVersion, rowSub;
-    private JTextArea updateNote;
-    private NovaBar bar;
-    private JTextArea log;
-    private final List<JComponent> animated = new ArrayList<>();
-    private final List<SideButton> sideButtons = new ArrayList<>();
-    private SideButton paletteBtn;
-    private volatile Account account;
-    private volatile boolean busy;
-
-    public static void main(String[] args) {
-        System.setProperty("awt.useSystemAAFontSettings", "on");
-        System.setProperty("swing.aatext", "true");
-        SwingUtilities.invokeLater(() -> new LauncherApp().show());
-    }
-
+    static final Color TEXT = new Color(0xF4F0FF), MUTED = new Color(0xB3AED0), DIM = new Color(0x77729A);
+    static final Color GREEN = new Color(0x8EF0B0), RED = new Color(0xFF8FA3);
+    static final Color INK = new Color(0x120C2A);   // dark text on pastel buttons
     // ------------------------------------------------------------------ fonts
     static Font font(int style, float size) {
         String[] want = {"Inter", "Segoe UI", "SF Pro Text", "Helvetica Neue", "Ubuntu", "DejaVu Sans"};
@@ -85,360 +68,201 @@ public final class LauncherApp {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+        g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+        g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+    }
+
+    // ---- shared look: glass panels + the crescent logo
+    /** A frosted, tinted panel like the client's module cards. Paints into (0,0,w,h). */
+    static void glass(Graphics2D g2, int w, int h, int arc, boolean strong, boolean dark) {
+        Color a = dark ? new Color(6, 5, 16, 200) : alpha(mix(ACCENT_DARK, SKY_TOP, 0.62f), strong ? 170 : 125);
+        Color b = dark ? new Color(6, 5, 16, 215) : alpha(mix(ACCENT_DARK, SKY_TOP, 0.82f), strong ? 140 : 95);
+        g2.setPaint(new GradientPaint(0, 0, a, 0, h, b));
+        g2.fillRoundRect(0, 0, w - 1, h - 1, arc, arc);
+        g2.setColor(new Color(255, 255, 255, strong ? 18 : 10));
+        g2.drawLine(arc / 2, 1, w - arc / 2, 1);
+        g2.setColor(alpha(ACCENT, strong ? 125 : 64));
+        g2.drawRoundRect(0, 0, w - 1, h - 1, arc, arc);
+    }
+
+    /** The Nova mark: a pixel crescent moon in a glass tile (same icon as the client's Singleplayer button). */
+    static void paintLogo(Graphics2D g2, int x, int y, int s) {
+        g2.setPaint(new GradientPaint(x, y, alpha(ACCENT_DARK, 205), x, y + s, alpha(mix(ACCENT_DARK, SKY_TOP, 0.6f), 235)));
+        g2.fillRoundRect(x, y, s, s, s / 3, s / 3);
+        g2.setColor(alpha(ACCENT, 150));
+        g2.drawRoundRect(x, y, s - 1, s - 1, s / 3, s / 3);
+        String[] m = {"...XXXX..", "..XXX....", ".XXX.....", ".XXX.....", ".XXX.....", ".XXX.....", "..XXX....", "...XXXX.."};
+        int cell = Math.max(2, s / 11);
+        int ox = x + (s - 9 * cell) / 2, oy = y + (s - 8 * cell) / 2;
+        g2.setColor(mix(ACCENT, Color.WHITE, 0.65f));
+        for (int r = 0; r < m.length; r++)
+            for (int c = 0; c < m[r].length(); c++)
+                if (m[r].charAt(c) == 'X') g2.fillRect(ox + c * cell, oy + r * cell, cell, cell);
     }
 
     static Color alpha(Color c, int a) { return new Color(c.getRed(), c.getGreen(), c.getBlue(), Math.max(0, Math.min(255, a))); }
 
-    // ------------------------------------------------------------------ UI
+
+    private final LauncherConfig cfg = LauncherConfig.load();
+    private final Path home = Platform.home();
+    private final Path gameDir = home.resolve("instances").resolve("default");
+
+    private JFrame frame;
+    private Orbit orbit;
+    private volatile Account account;
+    private volatile boolean busy;
+    private volatile NovaManifest manifest;     // latest.json, once fetched
+    private volatile List<String> versionList;  // every Minecraft release Fabric supports
+
+    public static void main(String[] args) {
+        System.setProperty("awt.useSystemAAFontSettings", "on");
+        System.setProperty("swing.aatext", "true");
+        SwingUtilities.invokeLater(() -> new LauncherApp().show());
+    }
+
+    // ------------------------------------------------------------------ window
     private void show() {
+        applyTheme(cfg.theme);
         frame = new JFrame("Nova Launcher");
+        frame.setUndecorated(true);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(1180, 720);
-        frame.setMinimumSize(new Dimension(1020, 640));
-        frame.setLocationRelativeTo(null);
+        frame.setResizable(false);
+        frame.setBackground(BG);
+        BufferedImage icon = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D ig = icon.createGraphics(); aa(ig); paintLogo(ig, 2, 2, 60); ig.dispose();
+        frame.setIconImage(icon);
         buildUi();
-        frame.setContentPane(root);
+        frame.setContentPane(orbit);
+        frame.pack();
+        frame.setLocationRelativeTo(null);
+        try { frame.setShape(new RoundRectangle2D.Double(0, 0, frame.getWidth(), frame.getHeight(), 30, 30)); } catch (Exception ignored) {}
         frame.setVisible(true);
-        new Timer(33, e -> { for (JComponent c : animated) if (c.isShowing()) c.repaint(); }).start();
+        new Timer(33, e -> { if (frame.isShowing() && frame.getState() != Frame.ICONIFIED) orbit.repaint(); }).start();
         startup();
     }
 
-    private String subtitleText(String mc) {
-        return "Fabric " + mc + "  \u2022  Sodium + Iris  \u2022  Nova Client";
-    }
-
     private void buildUi() {
-        applyTheme(cfg.theme);
-        String mc = cfg.mcVersion.isBlank() ? NovaUpdater.DEFAULT_MC : cfg.mcVersion;
-
-        root = new JPanel(new BorderLayout());
-        root.setBackground(BG);
-
-        // ---------- sidebar
-        JPanel side = new JPanel() {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create(); aa(g2);
-                g2.setColor(new Color(0x0D0D14)); g2.fillRect(0, 0, getWidth(), getHeight());
-                g2.setColor(BORDER); g2.fillRect(getWidth() - 1, 0, 1, getHeight());
-                // logo
-                int s = 38, x = (getWidth() - s) / 2, y = 18;
-                g2.setPaint(new GradientPaint(x, y, ACCENT, x + s, y + s, CYAN));
-                g2.fillRoundRect(x, y, s, s, 12, 12);
-                g2.setColor(Color.WHITE);
-                g2.setFont(font(Font.BOLD, 22f));
-                FontMetrics fm = g2.getFontMetrics();
-                g2.drawString("N", x + (s - fm.stringWidth("N")) / 2, y + (s - fm.getHeight()) / 2 + fm.getAscent());
-                g2.dispose();
-            }
-        };
-        side.setPreferredSize(new Dimension(72, 0));
-        side.setLayout(null);
-        SideButton home = new SideButton(Glyph.HOME, "Home", () -> showPage("home"));
-        SideButton console = new SideButton(Glyph.TERMINAL, "Console", () -> showPage("console"));
-        SideButton skin = new SideButton(Glyph.SHIRT, "Preview a skin file", this::previewSkinFile);
-        SideButton folder = new SideButton(Glyph.FOLDER, "Game folder", () -> {
+        orbit = new Orbit();
+        orbit.mc = displayMc();
+        orbit.ramMb = cfg.ramMb;
+        orbit.themeName = THEME_NAMES[cfg.theme];
+        orbit.note = "Nova Client is built in \u00B7 installs on Play";
+        orbit.onPlay = this::play;
+        orbit.onLogin = this::toggleLogin;
+        orbit.onSettings = this::openSettings;
+        orbit.onTheme = this::nextTheme;
+        orbit.onSkin = this::previewSkinFile;
+        orbit.onVersion = this::openVersions;
+        orbit.onMods = this::openMods;
+        orbit.onOfficial = this::addToOfficial;
+        orbit.onFolder = () -> {
             try { Files.createDirectories(gameDir); } catch (Exception ignored) {}
             Platform.openFolder(gameDir);
-        });
-        SideButton settings = new SideButton(Glyph.GEAR, "Settings", this::openSettings);
-        SideButton palette = new SideButton(Glyph.PALETTE, "Theme: " + THEME_NAMES[cfg.theme] + " (click to change)", this::nextTheme);
-        paletteBtn = palette;
-        SideButton[] top = {home, console, skin, folder};
-        for (int i = 0; i < top.length; i++) { top[i].setBounds(10, 82 + i * 54, 52, 46); side.add(top[i]); sideButtons.add(top[i]); }
-        home.selected = true;
-        side.addComponentListener(new java.awt.event.ComponentAdapter() {
-            @Override public void componentResized(java.awt.event.ComponentEvent e) {
-                settings.setBounds(10, side.getHeight() - 112, 52, 46);
-                palette.setBounds(10, side.getHeight() - 166, 52, 46);
-            }
-        });
-        settings.setBounds(10, 500, 52, 46);
-        side.add(settings);
-        palette.setBounds(10, 446, 52, 46);
-        side.add(palette);
-        PlayButton quick = new PlayButton(true);
-        quick.setBounds(14, 560, 44, 44);
-        quick.addActionListener(e -> play());
-        side.add(quick);
-        side.addComponentListener(new java.awt.event.ComponentAdapter() {
-            @Override public void componentResized(java.awt.event.ComponentEvent e) {
-                quick.setBounds(14, side.getHeight() - 58, 44, 44);
-            }
-        });
-        root.add(side, BorderLayout.WEST);
+        };
+        orbit.onMin = () -> { if (frame != null) frame.setState(Frame.ICONIFIED); };
+        orbit.onClose = () -> System.exit(0);
+        orbit.setSkin(null, false);
+    }
 
-        // ---------- pages
-        pages = new CardLayout();
-        pageHost = new JPanel(pages);
-        pageHost.setOpaque(false);
-        pageHost.add(buildHome(mc), "home");
-        pageHost.add(buildConsole(), "console");
-        root.add(pageHost, BorderLayout.CENTER);
-        animated.add(hero);
-        animated.add(playButton);
-        animated.add(quick);
-        animated.add(bar);
+    /** The Minecraft version shown (and played): the picked one, or whatever "automatic" resolves to. */
+    private String displayMc() {
+        return NovaUpdater.chooseMc(cfg, manifest, Embedded.load(), gameDir.resolve("mods"));
+    }
+
+    private void openMods() {
+        try { Files.createDirectories(gameDir.resolve("mods")); } catch (Exception ignored) {}
+        new ModsDialog(frame, gameDir.resolve("mods"), this::displayMc, this::chooseOptionalMods).setVisible(true);
+        orbit.mc = displayMc();
+    }
+
+    private void openVersions() {
+        if (busy) return;
+        List<String> vl = versionList;
+        if (vl != null) { showVersions(vl); return; }
+        setStatus("Loading Minecraft versions...");
+        async(() -> {
+            try {
+                List<String> l = VersionList.load(home);
+                versionList = l;
+                SwingUtilities.invokeLater(() -> { orbit.status = "Ready"; showVersions(l); });
+            } catch (Exception e) {
+                log("Could not load the version list: " + e.getMessage());
+                setStatus("Could not load the version list (offline?)");
+            }
+        });
+    }
+
+    private void showVersions(List<String> vl) {
+        NovaManifest m = manifest;
+        Embedded emb = Embedded.load();
+        Map<String, NovaManifest.Build> builds = m == null ? Map.of() : m.builds();
+        String embMc = emb == null ? null : emb.minecraft;
+        new VersionDialog(frame, vl, cfg.mcVersion, builds, embMc, picked -> {
+            cfg.mcVersion = picked;
+            cfg.save();
+            orbit.mc = displayMc();
+            String mc = orbit.mc;
+            String tag = VersionDialog.tagFor(mc, builds, embMc);
+            orbit.status = "Minecraft " + mc + (picked.isBlank() ? " (automatic)" : "");
+            if (tag.equals("Fabric only")) orbit.note = "No Nova build for " + mc + " yet \u00B7 it will start as plain Fabric";
+            else if (tag.contains("experimental")) orbit.note = "Nova for " + mc + " is experimental: some features may be missing";
+            else orbit.note = "Nova Client is available for " + mc;
+            frame.repaint();
+        }).setVisible(true);
     }
 
     private void nextTheme() {
         cfg.theme = (cfg.theme + 1) % THEME_NAMES.length;
         applyTheme(cfg.theme);
         cfg.save();
-        paletteBtn.setToolTipText("Theme: " + THEME_NAMES[cfg.theme] + " (click to change)");
-        status.setText("Theme: " + THEME_NAMES[cfg.theme]);
-        frame.getContentPane().repaint();
-    }
-
-    private void showPage(String name) {
-        pages.show(pageHost, name);
-        for (int i = 0; i < sideButtons.size(); i++) sideButtons.get(i).selected = (i == 0 && name.equals("home")) || (i == 1 && name.equals("console"));
-        for (SideButton b : sideButtons) b.repaint();
-    }
-
-    private JPanel buildHome(String mc) {
-        JPanel page = new JPanel(new BorderLayout(0, 16));
-        page.setOpaque(false);
-        page.setBorder(new EmptyBorder(18, 22, 20, 22));
-
-        // ----- top bar
-        JPanel topBar = new JPanel(new BorderLayout());
-        topBar.setOpaque(false);
-        JPanel tabs = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        tabs.setOpaque(false);
-        tabs.add(new TabPill("NOVA", true));
-        chipVersion = label("Minecraft " + mc, 13, true, MUTED);
-        JPanel vchip = chip(chipVersion);
-        tabs.add(vchip);
-        topBar.add(tabs, BorderLayout.WEST);
-        JPanel topRight = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        topRight.setOpaque(false);
-        NovaButton off = new NovaButton("Add to Minecraft Launcher", false);
-        off.addActionListener(e -> addToOfficial());
-        topRight.add(off);
-        topBar.add(topRight, BorderLayout.EAST);
-        page.add(topBar, BorderLayout.NORTH);
-
-        // ----- left column: hero + profiles
-        JPanel left = new JPanel(new BorderLayout(0, 14));
-        left.setOpaque(false);
-
-        hero = new Hero();
-        hero.setLayout(new BorderLayout());
-        skinPanel = new SkinPanel();
-        hero.add(skinPanel, BorderLayout.CENTER);
-
-        JPanel nameWrap = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 14));
-        nameWrap.setOpaque(false);
-        who = label("Not logged in", 15, true, TEXT);
-        nameWrap.add(chip(who));
-        hero.add(nameWrap, BorderLayout.NORTH);
-
-        JPanel acctWrap = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 16));
-        acctWrap.setOpaque(false);
-        JPanel acct = new RoundPanel(new Color(10, 10, 16, 215), BORDER, 18);
-        acct.setLayout(new BoxLayout(acct, BoxLayout.X_AXIS));
-        acct.setBorder(new EmptyBorder(10, 16, 10, 12));
-        hint = label("Playing offline as \"" + cfg.offlineName + "\"", 13, false, MUTED);
-        loginButton = new NovaButton("Log in with Microsoft", false);
-        loginButton.addActionListener(e -> toggleLogin(hint));
-        acct.add(hint); acct.add(Box.createHorizontalStrut(16)); acct.add(loginButton);
-        acctWrap.add(acct);
-        hero.add(acctWrap, BorderLayout.SOUTH);
-        left.add(hero, BorderLayout.CENTER);
-
-        JPanel profiles = new JPanel();
-        profiles.setOpaque(false);
-        profiles.setLayout(new BoxLayout(profiles, BoxLayout.Y_AXIS));
-        JLabel ph = label("Last Played Profiles", 14, true, TEXT);
-        ph.setAlignmentX(0);
-        profiles.add(ph);
-        profiles.add(Box.createVerticalStrut(10));
-        subtitle = label(subtitleText(mc), 13, false, MUTED);
-        playButton = new PlayButton(false);
-        playButton.addActionListener(e -> play());
-        NovaButton gear = new NovaButton("", false);
-        gear.glyph = Glyph.GEAR;
-        gear.addActionListener(e -> openSettings());
-        ProfileRow r1 = new ProfileRow("Nova Client", subtitle, true, 78);
-        r1.addAction(playButton); r1.addAction(gear);
-        profiles.add(r1);
-        profiles.add(Box.createVerticalStrut(10));
-        rowSub = label("Adds a \"Nova Client\" profile to the official launcher", 12, false, MUTED);
-        ProfileRow r2 = new ProfileRow("Official Launcher", rowSub, false, 62);
-        NovaButton addOff = new NovaButton("Add", false);
-        addOff.addActionListener(e -> addToOfficial());
-        r2.addAction(addOff);
-        profiles.add(r2);
-        left.add(profiles, BorderLayout.SOUTH);
-        page.add(left, BorderLayout.CENTER);
-
-        // ----- right column
-        JPanel right = new JPanel();
-        right.setOpaque(false);
-        right.setLayout(new BoxLayout(right, BoxLayout.Y_AXIS));
-        right.setPreferredSize(new Dimension(330, 0));
-
-        JLabel nh = label("\u2022 Latest News", 13, true, MUTED);
-        nh.setAlignmentX(0);
-        right.add(nh);
-        right.add(Box.createVerticalStrut(8));
-        Banner banner = new Banner();
-        banner.setLayout(new BorderLayout());
-        banner.setAlignmentX(0);
-        banner.setMaximumSize(new Dimension(Integer.MAX_VALUE, 150));
-        banner.setPreferredSize(new Dimension(330, 150));
-        updateNote = new JTextArea("Nova Client is built in and installs when you press Play");
-        updateNote.setEditable(false); updateNote.setOpaque(false); updateNote.setLineWrap(true); updateNote.setWrapStyleWord(true);
-        updateNote.setFont(font(Font.BOLD, 15f)); updateNote.setForeground(TEXT);
-        updateNote.setBorder(new EmptyBorder(0, 16, 14, 16));
-        updateNote.setPreferredSize(new Dimension(300, 70));
-        JLabel tag = label("CLIENT", 11, true, new Color(0xFFD9A8));
-        tag.setBorder(new EmptyBorder(14, 16, 0, 0));
-        banner.add(tag, BorderLayout.NORTH);
-        banner.add(updateNote, BorderLayout.SOUTH);
-        right.add(banner);
-        right.add(Box.createVerticalStrut(16));
-
-        JPanel info = new RoundPanel(SURFACE, BORDER, 16);
-        info.setLayout(new GridLayout(0, 1, 0, 0));
-        info.setBorder(new EmptyBorder(8, 18, 8, 18));
-        info.setAlignmentX(0);
-        info.setMaximumSize(new Dimension(Integer.MAX_VALUE, 168));
-        info.setPreferredSize(new Dimension(330, 168));
-        info.add(infoRow("Game", "Minecraft Java Edition"));
-        info.add(infoRow("Loader", "Fabric"));
-        info.add(infoRow("Performance", "Sodium + Iris"));
-        info.add(infoRow("Memory", String.format("%.1f GB", cfg.ramMb / 1024.0)));
-        right.add(info);
-        right.add(Box.createVerticalStrut(16));
-
-        JPanel st = new RoundPanel(SURFACE, BORDER, 16);
-        st.setLayout(new BoxLayout(st, BoxLayout.Y_AXIS));
-        st.setBorder(new EmptyBorder(16, 18, 16, 18));
-        st.setAlignmentX(0);
-        st.setMaximumSize(new Dimension(Integer.MAX_VALUE, 110));
-        JLabel sh = label("STATUS", 11, true, DIM);
-        sh.setAlignmentX(0);
-        status = label("Ready", 14, true, TEXT);
-        status.setAlignmentX(0);
-        bar = new NovaBar();
-        bar.setAlignmentX(0);
-        bar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 8));
-        bar.setPreferredSize(new Dimension(280, 8));
-        st.add(sh); st.add(Box.createVerticalStrut(6)); st.add(status); st.add(Box.createVerticalStrut(12)); st.add(bar);
-        right.add(st);
-        right.add(Box.createVerticalStrut(16));
-
-        JPanel keys = new RoundPanel(SURFACE, BORDER, 16);
-        keys.setLayout(new GridLayout(0, 1, 0, 6));
-        keys.setBorder(new EmptyBorder(14, 18, 14, 18));
-        keys.setAlignmentX(0);
-        keys.setMaximumSize(new Dimension(Integer.MAX_VALUE, 150));
-        keys.setPreferredSize(new Dimension(330, 140));
-        keys.add(label("IN-GAME", 11, true, DIM));
-        keys.add(infoRow("Right Shift", "Module menu"));
-        keys.add(infoRow("Hold C", "Zoom"));
-        keys.add(infoRow("F6", "Freecam"));
-        right.add(keys);
-        right.add(Box.createVerticalGlue());
-        page.add(right, BorderLayout.EAST);
-        // gap between center and right column
-        left.setBorder(new EmptyBorder(0, 0, 0, 20));
-        return page;
-    }
-
-    private JPanel buildConsole() {
-        JPanel page = new JPanel(new BorderLayout(0, 14));
-        page.setOpaque(false);
-        page.setBorder(new EmptyBorder(18, 22, 20, 22));
-        JLabel h = label("Console", 20, true, TEXT);
-        page.add(h, BorderLayout.NORTH);
-        log = new JTextArea();
-        log.setEditable(false);
-        log.setOpaque(false);
-        log.setForeground(mix(ACCENT, Color.WHITE, 0.6f));
-        log.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-        log.setBorder(new EmptyBorder(12, 14, 12, 14));
-        JScrollPane sp = new JScrollPane(log);
-        sp.setOpaque(false);
-        sp.getViewport().setOpaque(false);
-        sp.setBorder(null);
-        sp.getVerticalScrollBar().setUnitIncrement(16);
-        JPanel box = new RoundPanel(new Color(0x0D0D14), BORDER, 16);
-        box.setLayout(new BorderLayout());
-        box.add(sp);
-        page.add(box, BorderLayout.CENTER);
-        return page;
+        orbit.themeName = THEME_NAMES[cfg.theme];
+        orbit.status = "Theme: " + THEME_NAMES[cfg.theme];
     }
 
     private void openSettings() {
         new SettingsDialog(frame, cfg, () -> {
-            String mc = cfg.mcVersion.isBlank() ? NovaUpdater.DEFAULT_MC : cfg.mcVersion;
-            chipVersion.setText("Minecraft " + mc);
-            subtitle.setText(subtitleText(mc));
+            orbit.mc = displayMc();
+            orbit.ramMb = cfg.ramMb;
             frame.repaint();
         }).setVisible(true);
     }
 
-    private JPanel infoRow(String k, String v) {
-        JPanel p = new JPanel(new BorderLayout());
-        p.setOpaque(false);
-        p.add(label(k, 13, false, MUTED), BorderLayout.WEST);
-        p.add(label(v, 13, true, TEXT), BorderLayout.EAST);
-        return p;
-    }
-
-    private static JPanel chip(JLabel l) {
-        JPanel p = new RoundPanel(new Color(10, 10, 16, 215), BORDER, 14);
-        p.setLayout(new BorderLayout());
-        p.setBorder(new EmptyBorder(6, 14, 6, 14));
-        p.add(l);
-        return p;
-    }
-
-    /** Renders the launcher UI to a PNG without opening a window (used for docs/screenshots). */
+    /** Renders the launcher to a PNG without opening a window (used for docs/screenshots). */
+    static Point previewMouse;
     static void preview(String file, boolean playing, boolean console) throws Exception { preview(file, playing, console, 0); }
 
     static void preview(String file, boolean playing, boolean console, int theme) throws Exception {
-        LauncherApp app = new LauncherApp();
-        app.cfg.theme = theme;
-        app.buildUi();
+        applyTheme(theme);
+        Orbit o = new Orbit();
+        o.themeName = THEME_NAMES[theme];
+        o.who = "Dalif"; o.loggedIn = true; o.loginText = "log out";
+        o.note = "Nova Client 0.5.0 is built in \u00B7 installs on Play";
+        o.ramMb = 16384;
+        if (playing) { o.working = true; o.progress = 0.38f; o.status = "Downloading game files (1520/3980)"; }
+        else o.status = "Ready";
+        o.addLog("Nova Launcher 2.0.0 - data folder: C:\\Users\\dalif\\AppData\\Roaming\\.novaclient");
+        o.addLog("Built-in Nova Client 0.5.0 (Minecraft 1.21.4)");
+        o.addLog("Logged in as Dalif");
+        o.addLog("Nova Client 0.5.0 is ready");
+        if (console) o.toggleConsole();
         int w = 1180, h = 720;
-        app.root.setSize(w, h);
-        app.who.setText("Dalif");
-        app.hint.setText("Signed in with Microsoft");
-        app.loginButton.setText("Log out");
-        app.updateNote.setText("Nova Client 0.5.0 is built in - installs automatically on Play");
-        app.log.setText("Nova Launcher 2.0.0 - data folder: C:\\Users\\dalif\\AppData\\Roaming\\.novaclient\n"
-                + "Built-in Nova Client 0.5.0 (Minecraft 1.21.4)\nLogged in as Dalif\nNova Client 0.5.0 is ready\n");
-        if (playing) {
-            app.playButton.setEnabled(false);
-            app.bar.setValue(38);
-            app.status.setText("Downloading game files (1520/3980)");
-        } else {
-            app.status.setText("Logged in as Dalif");
-        }
-        if (console) app.showPage("console");
-        layoutAll(app.root);
+        o.setSize(w, h);
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g = img.createGraphics();
-        aa(g);
-        app.root.paint(g);
-        g.dispose();
+        if (previewMouse != null) o.simulateMouse(previewMouse.x, previewMouse.y);
+        for (int i = 0; i < 40; i++) {                // let the console slide in / hover states settle
+            Graphics2D g = img.createGraphics();
+            o.paint(g);
+            g.dispose();
+        }
         ImageIO.write(img, "png", new File(file));
-    }
-
-    private static void layoutAll(Container c) {
-        c.invalidate();
-        c.doLayout();
-        for (Component k : c.getComponents()) if (k instanceof Container) layoutAll((Container) k);
     }
 
     private void startup() {
         log("Nova Launcher " + GameLauncher.VERSION + " - data folder: " + home);
         Embedded emb = Embedded.load();
         if (emb != null) {
-            updateNote.setText("Nova Client " + emb.version + " is built in - it installs automatically when you press Play");
+            orbit.note = "Nova Client " + emb.version + " is built in \u00B7 installs on Play";
             log("Built-in Nova Client " + emb.version + " (Minecraft " + emb.minecraft + ")");
         }
         if (!cfg.refreshToken.isBlank() && !cfg.azureClientId.isBlank()) {
@@ -453,23 +277,22 @@ public final class LauncherApp {
                 }
             });
         }
+        async(() -> { try { versionList = VersionList.load(home); } catch (Exception e) { log("Version list not loaded: " + e.getMessage()); } });
         // Look for a newer launcher / Nova version (does not install anything yet)
         if (!cfg.manifestUrl.isBlank()) {
             async(() -> {
                 try {
-                    var m = Http.getJson(cfg.manifestUrl);
-                    String ver = Json.str(m, "version");
-                    var l = Json.o(m.get("launcher"));
-                    String lv = Json.str(l, "version"), lu = Json.str(l, "url");
+                    NovaManifest nm = NovaManifest.fetch(cfg.manifestUrl);
+                    manifest = nm;
+                    String ver = nm.version();
+                    String lv = nm.launcherVersion(), lu = nm.launcherUrl();
                     SwingUtilities.invokeLater(() -> {
+                        orbit.mc = displayMc();
                         if (lv != null && Versions.cmp(lv, GameLauncher.VERSION) > 0) {
-                            updateNote.setText("A new launcher (" + lv + ") is available - click here to download");
-                            updateNote.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-                            updateNote.addMouseListener(new MouseAdapter() {
-                                public void mouseClicked(MouseEvent e) { if (lu != null) Platform.open(lu); }
-                            });
+                            orbit.note = "A new launcher (" + lv + ") is available - click to download";
+                            orbit.noteUrl = lu;
                         } else if (ver != null) {
-                            updateNote.setText("Nova Client " + ver + " will be installed/updated when you press Play");
+                            orbit.note = "Nova Client " + ver + " installs/updates when you press Play";
                         }
                     });
                 } catch (Exception ignored) {}
@@ -478,15 +301,15 @@ public final class LauncherApp {
     }
 
     // ------------------------------------------------------------------ login
-    private void toggleLogin(JLabel hint) {
+    private void toggleLogin() {
         if (account != null && account.online) {
             account = null;
             cfg.refreshToken = "";
             cfg.save();
-            who.setText("Not logged in");
-            hint.setText("Playing offline as \"" + cfg.offlineName + "\"");
-            skinPanel.setSkin(null);
-            loginButton.setText("Log in with Microsoft");
+            orbit.loggedIn = false;
+            orbit.who = "Not logged in";
+            orbit.loginText = "log in with microsoft";
+            orbit.setSkin(null, false);
             return;
         }
         if (cfg.azureClientId.isBlank()) {
@@ -525,10 +348,10 @@ public final class LauncherApp {
         }
         BufferedImage fs = skin;
         SwingUtilities.invokeLater(() -> {
-            who.setText(a.name);
-            hint.setText("Signed in with Microsoft");
-            loginButton.setText("Log out");
-            skinPanel.setSkin(fs, a.slim);
+            orbit.who = a.name;
+            orbit.loggedIn = true;
+            orbit.loginText = "log out";
+            orbit.setSkin(fs, a.slim);
         });
         setStatus("Logged in as " + a.name);
         log("Logged in as " + a.name);
@@ -541,7 +364,7 @@ public final class LauncherApp {
             try {
                 BufferedImage img = ImageIO.read(fc.getSelectedFile());
                 if (img == null) throw new Exception("not an image");
-                skinPanel.setSkin(img, false);
+                orbit.setSkin(img, false);
             } catch (Exception e) {
                 JOptionPane.showMessageDialog(frame, "Could not read that file: " + e.getMessage());
             }
@@ -549,21 +372,30 @@ public final class LauncherApp {
     }
 
     // ------------------------------------------------------------------ play
+    private void chooseOptionalMods() {
+        new OptionalModsDialog(frame, cfg, this::displayMc, () -> orbit.status = "Mods saved: they are installed when you press Play").setVisible(true);
+    }
+
     private void play() {
         if (busy) return;
+        if (!cfg.optionalChosen) {          // first launch: let the player pick Sodium / Iris / Freecam before anything is installed
+            cfg.optionalChosen = true;
+            cfg.save();
+            chooseOptionalMods();
+        }
         busy = true;
-        playButton.setEnabled(false);
+        SwingUtilities.invokeLater(() -> { orbit.working = true; orbit.progress = 0; });
         async(() -> {
             try {
                 Progress prog = new Progress() {
                     public void status(String m) { setStatus(m); log(m); }
-                    public void bar(int d, int t) { SwingUtilities.invokeLater(() -> { bar.setIndeterminate(false); bar.setValue(t <= 0 ? 0 : d * 100 / t); }); }
+                    public void bar(int d, int t) { SwingUtilities.invokeLater(() -> { orbit.indeterminate = false; orbit.progress = t <= 0 ? 0 : (float) d / t; }); }
                 };
-                SwingUtilities.invokeLater(() -> bar.setIndeterminate(true));
+                SwingUtilities.invokeLater(() -> orbit.indeterminate = true);
 
                 NovaUpdater.Result res = NovaUpdater.sync(cfg, gameDir, prog);
-                log("Nova Client: " + res.novaVersion() + "  |  Minecraft " + res.mcVersion());
-                SwingUtilities.invokeLater(() -> { subtitle.setText(subtitleText(res.mcVersion())); chipVersion.setText("Minecraft " + res.mcVersion()); });
+                log("Nova Client: " + res.novaVersion() + "  |  Minecraft " + res.mcVersion() + (res.novaLoaded() ? "" : "  |  plain Fabric"));
+                SwingUtilities.invokeLater(() -> orbit.mc = res.mcVersion());
 
                 Installer.Plan plan = new Installer(home, prog).install(res.mcVersion());
                 Path java = JavaRuntime.ensure(plan.javaMajor(), home, cfg.javaPath, prog);
@@ -590,7 +422,7 @@ public final class LauncherApp {
                 List<String> cmd = GameLauncher.command(plan, acct, java, gameDir, cfg.ramMb, extra);
 
                 setStatus("Minecraft is running");
-                SwingUtilities.invokeLater(() -> { bar.setIndeterminate(false); bar.setValue(100); });
+                SwingUtilities.invokeLater(() -> { orbit.indeterminate = false; orbit.progress = 1f; });
                 Process pr = GameLauncher.start(cmd, gameDir);
                 try (BufferedReader r = new BufferedReader(new InputStreamReader(pr.getInputStream(), StandardCharsets.UTF_8))) {
                     String line;
@@ -598,14 +430,14 @@ public final class LauncherApp {
                 }
                 int code = pr.waitFor();
                 log("Game closed (exit code " + code + ")");
-                setStatus(code == 0 ? "Ready" : "Game exited with code " + code + " - see the log");
+                setStatus(code == 0 ? "Ready" : "Game exited with code " + code + " - see the console");
             } catch (Exception e) {
                 log("ERROR: " + e);
                 setStatus("Error: " + e.getMessage());
-                SwingUtilities.invokeLater(() -> bar.setIndeterminate(false));
+                SwingUtilities.invokeLater(() -> orbit.indeterminate = false);
             } finally {
                 busy = false;
-                SwingUtilities.invokeLater(() -> { playButton.setEnabled(true); bar.setValue(0); });
+                SwingUtilities.invokeLater(() -> { orbit.working = false; orbit.indeterminate = false; orbit.progress = 0; });
             }
         });
     }
@@ -614,14 +446,13 @@ public final class LauncherApp {
     private void addToOfficial() {
         if (busy) return;
         busy = true;
-        playButton.setEnabled(false);
+        SwingUtilities.invokeLater(() -> { orbit.working = true; orbit.indeterminate = true; });
         async(() -> {
             try {
                 Progress prog = new Progress() {
                     public void status(String m) { setStatus(m); log(m); }
                     public void bar(int d, int t) {}
                 };
-                SwingUtilities.invokeLater(() -> bar.setIndeterminate(true));
                 String msg = OfficialLauncher.install(cfg, home, gameDir, prog);
                 log(msg);
                 setStatus("Added to the Minecraft Launcher");
@@ -633,7 +464,7 @@ public final class LauncherApp {
                 setStatus("Error: " + e.getMessage());
             } finally {
                 busy = false;
-                SwingUtilities.invokeLater(() -> { playButton.setEnabled(true); bar.setIndeterminate(false); bar.setValue(0); });
+                SwingUtilities.invokeLater(() -> { orbit.working = false; orbit.indeterminate = false; orbit.progress = 0; });
             }
         });
     }
@@ -645,14 +476,9 @@ public final class LauncherApp {
         t.start();
     }
 
-    private void setStatus(String s) { SwingUtilities.invokeLater(() -> status.setText(s)); }
+    private void setStatus(String s) { SwingUtilities.invokeLater(() -> orbit.status = s); }
 
-    private void log(String line) {
-        SwingUtilities.invokeLater(() -> {
-            log.append(line + "\n");
-            log.setCaretPosition(log.getDocument().getLength());
-        });
-    }
+    private void log(String line) { SwingUtilities.invokeLater(() -> orbit.addLog(line)); }
 
     static JLabel label(String text, int size, boolean bold, Color c) {
         JLabel l = new JLabel(text);
@@ -664,9 +490,9 @@ public final class LauncherApp {
     /** A pixel skin used before you log in, so the hero card never looks empty. */
     static BufferedImage defaultSkin() {
         BufferedImage skin = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
-        int[][] r = {{8, 8, 8, 8, 0xFFD9A066}, {20, 20, 8, 12, 0xFF6D28D9}, {44, 20, 4, 12, 0xFF7C3AED}, {36, 52, 4, 12, 0xFF7C3AED},
-                {4, 20, 4, 12, 0xFF1E1B4B}, {20, 52, 4, 12, 0xFF1E1B4B}, {40, 8, 8, 4, 0xFF2B1B3D}, {8, 8, 8, 2, 0xFF2B1B3D},
-                {20, 26, 8, 2, 0xFF22D3EE}, {8, 10, 1, 4, 0xFF2B1B3D}, {15, 10, 1, 4, 0xFF2B1B3D}};
+        int[][] r = {{8, 8, 8, 8, 0xFFD9A066}, {20, 20, 8, 12, 0xFF7C6BD6}, {44, 20, 4, 12, 0xFF8E7EE6}, {36, 52, 4, 12, 0xFF8E7EE6},
+                {4, 20, 4, 12, 0xFF2A2550}, {20, 52, 4, 12, 0xFF2A2550}, {40, 8, 8, 4, 0xFF2B1B3D}, {8, 8, 8, 2, 0xFF2B1B3D},
+                {20, 26, 8, 2, 0xFFFFC2A8}, {8, 10, 1, 4, 0xFF2B1B3D}, {15, 10, 1, 4, 0xFF2B1B3D}};
         for (int[] q : r) for (int y = q[1]; y < q[1] + q[3]; y++) for (int x = q[0]; x < q[0] + q[2]; x++) skin.setRGB(x, y, q[4]);
         skin.setRGB(10, 12, 0xFFFFFFFF); skin.setRGB(13, 12, 0xFFFFFFFF);
         skin.setRGB(9, 12, 0xFF3B1D8A); skin.setRGB(14, 12, 0xFF3B1D8A);
@@ -676,7 +502,7 @@ public final class LauncherApp {
 
     // ------------------------------------------------------------------ glyphs (vector icons)
     enum Glyph {
-        HOME, TERMINAL, SHIRT, FOLDER, GEAR, PLAY, PALETTE;
+        HOME, TERMINAL, SHIRT, FOLDER, GEAR, PLAY, PALETTE, PLUS, BOX;
 
         void paint(Graphics2D g, double cx, double cy, double s, Color c) {
             g.setColor(c);
@@ -727,6 +553,20 @@ public final class LauncherApp {
                     double[][] pos = {{-0.4, -0.35}, {0.35, -0.3}, {0.0, 0.45}};
                     for (int i = 0; i < 3; i++) { g.setColor(cs[i]); g.fill(new Ellipse2D.Double(cx + pos[i][0] * h - 2.6, cy + pos[i][1] * h - 2.6, 5.2, 5.2)); }
                 }
+                case BOX -> {
+                    Path2D top = new Path2D.Double();
+                    top.moveTo(cx, cy - h); top.lineTo(cx + h * 0.87, cy - h * 0.5); top.lineTo(cx, cy); top.lineTo(cx - h * 0.87, cy - h * 0.5); top.closePath();
+                    g.draw(top);
+                    Path2D sides = new Path2D.Double();
+                    sides.moveTo(cx - h * 0.87, cy - h * 0.5); sides.lineTo(cx - h * 0.87, cy + h * 0.5); sides.lineTo(cx, cy + h);
+                    sides.lineTo(cx + h * 0.87, cy + h * 0.5); sides.lineTo(cx + h * 0.87, cy - h * 0.5);
+                    g.draw(sides);
+                    g.draw(new Line2D.Double(cx, cy, cx, cy + h));
+                }
+                case PLUS -> {
+                    g.draw(new Line2D.Double(cx - h * 0.8, cy, cx + h * 0.8, cy));
+                    g.draw(new Line2D.Double(cx, cy - h * 0.8, cx, cy + h * 0.8));
+                }
                 case PLAY -> {
                     Path2D p = new Path2D.Double();
                     p.moveTo(cx - h * 0.5, cy - h * 0.7); p.lineTo(cx + h * 0.7, cy); p.lineTo(cx - h * 0.5, cy + h * 0.7); p.closePath();
@@ -737,213 +577,6 @@ public final class LauncherApp {
     }
 
     // ------------------------------------------------------------------ components
-    static class RoundPanel extends JPanel {
-        private final Color fill, border;
-        private final int arc;
-        RoundPanel(Color fill, Color border, int arc) { this.fill = fill; this.border = border; this.arc = arc; setOpaque(false); }
-        @Override protected void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D) g.create(); aa(g2);
-            g2.setColor(fill); g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, arc, arc);
-            if (border != null) { g2.setColor(border); g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, arc, arc); }
-            g2.dispose();
-        }
-    }
-
-    static final class TabPill extends JComponent {
-        private final String text; private final boolean active;
-        TabPill(String text, boolean active) { this.text = text; this.active = active; setPreferredSize(new Dimension(150, 40)); }
-        @Override protected void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D) g.create(); aa(g2);
-            int w = getWidth(), h = getHeight();
-            g2.setPaint(active ? new GradientPaint(0, 0, ACCENT, w, 0, CYAN) : new GradientPaint(0, 0, SURFACE, w, 0, SURFACE));
-            g2.fillRoundRect(0, 0, w, h, 14, 14);
-            g2.setColor(new Color(255, 255, 255, 40)); g2.drawRoundRect(0, 0, w - 1, h - 1, 14, 14);
-            g2.setFont(font(Font.BOLD, 17f));
-            FontMetrics fm = g2.getFontMetrics();
-            g2.setColor(new Color(0, 0, 0, 90)); g2.drawString(text, (w - fm.stringWidth(text)) / 2 + 1, (h - fm.getHeight()) / 2 + fm.getAscent() + 1);
-            g2.setColor(Color.WHITE); g2.drawString(text, (w - fm.stringWidth(text)) / 2, (h - fm.getHeight()) / 2 + fm.getAscent());
-            g2.dispose();
-        }
-    }
-
-    static final class SideButton extends JComponent {
-        private final Glyph glyph; boolean selected, hover;
-        SideButton(Glyph glyph, String tip, Runnable action) {
-            this.glyph = glyph; setToolTipText(tip);
-            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            addMouseListener(new MouseAdapter() {
-                public void mouseEntered(MouseEvent e) { hover = true; repaint(); }
-                public void mouseExited(MouseEvent e) { hover = false; repaint(); }
-                public void mouseClicked(MouseEvent e) { action.run(); }
-            });
-        }
-        @Override protected void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D) g.create(); aa(g2);
-            int w = getWidth(), h = getHeight();
-            if (selected || hover) { g2.setColor(selected ? alpha(ACCENT, 46) : new Color(255, 255, 255, 14)); g2.fillRoundRect(0, 0, w, h, 14, 14); }
-            if (selected) { g2.setColor(ACCENT); g2.fillRoundRect(-3, h / 2 - 11, 5, 22, 5, 5); }
-            glyph.paint(g2, w / 2.0, h / 2.0, 22, selected ? mix(ACCENT, Color.WHITE, 0.6f) : hover ? Color.WHITE : MUTED);
-            g2.dispose();
-        }
-    }
-
-    /** Dusk sky with twinkling stars and blocky terrain, in Nova colours. */
-    static final class Hero extends JPanel {
-        private static final int N = 90;
-        private final float[] sx = new float[N], sy = new float[N], sp = new float[N];
-        Hero() {
-            setOpaque(false);
-            Random r = new Random(7);
-            for (int i = 0; i < N; i++) { sx[i] = r.nextFloat(); sy[i] = r.nextFloat() * 0.78f; sp[i] = r.nextFloat() * 6.28f; }
-        }
-        @Override protected void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D) g.create(); aa(g2);
-            int w = getWidth(), h = getHeight(), arc = 26;
-            Shape clip = new RoundRectangle2D.Double(0, 0, w, h, arc, arc);
-            g2.setClip(clip);
-            g2.setPaint(new LinearGradientPaint(0, 0, 0, h, new float[]{0f, 0.55f, 0.85f, 1f},
-                    new Color[]{mix(ACCENT_DARK, Color.BLACK, 0.88f), mix(ACCENT_DARK, Color.BLACK, 0.45f), ACCENT, mix(CYAN, Color.WHITE, 0.25f)}));
-            g2.fillRect(0, 0, w, h);
-            double t = System.nanoTime() / 1e9;
-            for (int i = 0; i < N; i++) {
-                float tw = 0.35f + 0.65f * (0.5f + 0.5f * (float) Math.sin(t * 1.6 + sp[i]));
-                g2.setColor(new Color(255, 255, 255, (int) (tw * 200)));
-                int s = i % 7 == 0 ? 3 : 2;
-                g2.fillRect((int) (sx[i] * w), (int) (sy[i] * h), s, s);
-            }
-            // moon glow
-            g2.setPaint(new RadialGradientPaint(new Point2D.Double(w * 0.82, h * 0.2), h * 0.35f, new float[]{0f, 1f},
-                    new Color[]{alpha(CYAN, 90), alpha(CYAN, 0)}));
-            g2.fillRect(0, 0, w, h);
-            g2.setColor(mix(CYAN, Color.WHITE, 0.8f)); g2.fillRect((int) (w * 0.82) - 14, (int) (h * 0.2) - 14, 28, 28);
-            // blocky hills (two layers)
-            blocks(g2, w, h, 0.72, 34, mix(ACCENT_DARK, Color.BLACK, 0.55f), 3);
-            blocks(g2, w, h, 0.82, 26, mix(ACCENT_DARK, Color.BLACK, 0.8f), 11);
-            // top shade so chips stay readable
-            g2.setPaint(new GradientPaint(0, 0, new Color(0, 0, 0, 120), 0, 90, new Color(0, 0, 0, 0)));
-            g2.fillRect(0, 0, w, 90);
-            g2.setClip(null);
-            g2.setColor(BORDER); g2.draw(new RoundRectangle2D.Double(0.5, 0.5, w - 1, h - 1, arc, arc));
-            g2.dispose();
-        }
-        private void blocks(Graphics2D g2, int w, int h, double base, int cell, Color c, long seed) {
-            Random r = new Random(seed);
-            g2.setColor(c);
-            int y = (int) (h * base);
-            for (int x = 0; x < w; x += cell) {
-                y += (r.nextInt(3) - 1) * cell / 2;
-                y = Math.max((int) (h * (base - 0.08)), Math.min((int) (h * (base + 0.06)), y));
-                g2.fillRect(x, y, cell + 1, h - y);
-            }
-        }
-    }
-
-    static final class Banner extends JPanel {
-        Banner() { setOpaque(false); }
-        @Override protected void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D) g.create(); aa(g2);
-            int w = getWidth(), h = getHeight();
-            Shape clip = new RoundRectangle2D.Double(0, 0, w, h, 18, 18);
-            g2.setClip(clip);
-            g2.setPaint(new GradientPaint(0, 0, mix(ACCENT_DARK, Color.BLACK, 0.1f), w, h, mix(CYAN, Color.BLACK, 0.5f)));
-            g2.fillRect(0, 0, w, h);
-            g2.setFont(font(Font.BOLD, 76f));
-            g2.setColor(new Color(255, 255, 255, 26));
-            g2.drawString("NOVA", w - g2.getFontMetrics().stringWidth("NOVA") - 8, h / 2 + 6);
-            g2.setPaint(new GradientPaint(0, h * 0.3f, new Color(0, 0, 0, 0), 0, h, new Color(0, 0, 0, 170)));
-            g2.fillRect(0, 0, w, h);
-            g2.setClip(null);
-            g2.setColor(BORDER); g2.draw(new RoundRectangle2D.Double(0.5, 0.5, w - 1, h - 1, 18, 18));
-            g2.dispose();
-        }
-    }
-
-    static final class ProfileRow extends JPanel {
-        private final boolean featured; private final JPanel actions;
-        ProfileRow(String title, JLabel sub, boolean featured, int height) {
-            this.featured = featured;
-            setOpaque(false);
-            setLayout(new BorderLayout(14, 0));
-            setBorder(new EmptyBorder(10, 14, 10, 14));
-            setAlignmentX(0);
-            setPreferredSize(new Dimension(100, height));
-            setMaximumSize(new Dimension(Integer.MAX_VALUE, height));
-            int ic = height - 22;
-            JComponent icon = new JComponent() {
-                @Override protected void paintComponent(Graphics g) {
-                    Graphics2D g2 = (Graphics2D) g.create(); aa(g2);
-                    g2.setPaint(new GradientPaint(0, 0, ACCENT, getWidth(), getHeight(), CYAN));
-                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), 14, 14);
-                    g2.setColor(Color.WHITE); g2.setFont(font(Font.BOLD, getHeight() * 0.5f));
-                    FontMetrics fm = g2.getFontMetrics();
-                    g2.drawString("N", (getWidth() - fm.stringWidth("N")) / 2, (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
-                    g2.dispose();
-                }
-            };
-            icon.setPreferredSize(new Dimension(ic, ic));
-            JPanel iconWrap = new JPanel(new GridBagLayout()); iconWrap.setOpaque(false); iconWrap.add(icon);
-            add(iconWrap, BorderLayout.WEST);
-            JPanel text = new JPanel(new GridLayout(2, 1, 0, 2)); text.setOpaque(false);
-            JLabel t = label(title, featured ? 19 : 15, true, TEXT);
-            text.add(t); text.add(sub);
-            JPanel tw = new JPanel(new GridBagLayout()); tw.setOpaque(false); tw.add(text, new GridBagConstraints() {{ anchor = WEST; weightx = 1; }});
-            add(tw, BorderLayout.CENTER);
-            actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0)); actions.setOpaque(false);
-            JPanel aw = new JPanel(new GridBagLayout()); aw.setOpaque(false); aw.add(actions);
-            add(aw, BorderLayout.EAST);
-        }
-        void addAction(JComponent c) { actions.add(c); }
-        @Override protected void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D) g.create(); aa(g2);
-            int w = getWidth(), h = getHeight();
-            g2.setPaint(featured ? new GradientPaint(0, 0, mix(ACCENT_DARK, SURFACE, 0.82f), w, 0, SURFACE) : new GradientPaint(0, 0, SURFACE, w, 0, SURFACE));
-            g2.fillRoundRect(0, 0, w - 1, h - 1, 20, 20);
-            g2.setColor(featured ? alpha(ACCENT, 90) : BORDER);
-            g2.drawRoundRect(0, 0, w - 1, h - 1, 20, 20);
-            g2.dispose();
-        }
-    }
-
-    static final class PlayButton extends JButton {
-        private final boolean compact; private boolean hover;
-        PlayButton(boolean compact) {
-            this.compact = compact;
-            setContentAreaFilled(false); setBorderPainted(false); setFocusPainted(false); setOpaque(false);
-            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            setPreferredSize(compact ? new Dimension(44, 44) : new Dimension(150, 46));
-            addMouseListener(new MouseAdapter() {
-                public void mouseEntered(MouseEvent e) { hover = true; repaint(); }
-                public void mouseExited(MouseEvent e) { hover = false; repaint(); }
-            });
-        }
-        @Override protected void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D) g.create(); aa(g2);
-            int w = getWidth(), h = getHeight();
-            boolean on = isEnabled();
-            double pulse = 0.5 + 0.5 * Math.sin(System.nanoTime() / 4e8);
-            if (on) {
-                g2.setColor(new Color(34, 197, 94, (int) (hover ? 70 : 28 + 22 * pulse)));
-                g2.fillRoundRect(-2, -2, w + 3, h + 3, 18, 18);
-            }
-            g2.setPaint(on ? new GradientPaint(0, 0, hover ? new Color(0x4ADE80) : GREEN_BTN, 0, h, GREEN_DARK) : new GradientPaint(0, 0, new Color(0x3F3F52), 0, h, new Color(0x2A2A3A)));
-            g2.fillRoundRect(0, 0, w - 1, h - 1, compact ? 14 : 16, compact ? 14 : 16);
-            g2.setColor(new Color(255, 255, 255, on ? 70 : 25)); g2.drawRoundRect(0, 0, w - 1, h - 1, compact ? 14 : 16, compact ? 14 : 16);
-            if (compact) {
-                Glyph.PLAY.paint(g2, w / 2.0 + 1, h / 2.0, 18, Color.WHITE);
-            } else {
-                String s = on ? "Play" : "Launching...";
-                g2.setFont(font(Font.BOLD, 17f));
-                FontMetrics fm = g2.getFontMetrics();
-                int tw = fm.stringWidth(s) + (on ? 28 : 0);
-                int x = (w - tw) / 2;
-                if (on) { Glyph.PLAY.paint(g2, x + 8, h / 2.0, 16, Color.WHITE); x += 28; }
-                g2.setColor(Color.WHITE);
-                g2.drawString(s, x, (h - fm.getHeight()) / 2 + fm.getAscent());
-            }
-            g2.dispose();
-        }
-    }
-
     static final class NovaButton extends JButton {
         private final boolean primary; private boolean hover; Glyph glyph;
         NovaButton(String text, boolean primary) {
@@ -967,69 +600,17 @@ public final class LauncherApp {
         @Override protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create(); aa(g2);
             int w = getWidth(), h = getHeight();
-            if (!isEnabled()) g2.setColor(new Color(60, 60, 78));
-            else if (primary) g2.setPaint(new GradientPaint(0, 0, hover ? new Color(0xA78BFA) : ACCENT, 0, h, ACCENT_DARK));
-            else g2.setColor(hover ? new Color(0x2A2A3C) : SURFACE2);
+            if (!isEnabled()) g2.setColor(new Color(255, 255, 255, 18));
+            else if (primary) g2.setPaint(new GradientPaint(0, 0, hover ? mix(ACCENT, Color.WHITE, 0.3f) : ACCENT, 0, h, mix(ACCENT, ACCENT_DARK, 0.45f)));
+            else g2.setColor(alpha(mix(ACCENT_DARK, SKY_TOP, hover ? 0.4f : 0.6f), hover ? 210 : 160));
             g2.fillRoundRect(0, 0, w - 1, h - 1, 14, 14);
-            g2.setColor(hover && isEnabled() ? alpha(CYAN, 160) : new Color(255, 255, 255, 30));
+            g2.setColor(primary ? new Color(255, 255, 255, 90) : alpha(ACCENT, hover && isEnabled() ? 200 : 75));
             g2.drawRoundRect(0, 0, w - 1, h - 1, 14, 14);
             if (glyph != null) glyph.paint(g2, w / 2.0, h / 2.0, 20, hover ? Color.WHITE : MUTED);
             g2.setFont(getFont());
             FontMetrics fm = g2.getFontMetrics();
-            g2.setColor(Color.WHITE);
+            g2.setColor(!isEnabled() ? DIM : primary ? INK : TEXT);
             g2.drawString(getText(), (w - fm.stringWidth(getText())) / 2, (h - fm.getHeight()) / 2 + fm.getAscent());
-            g2.dispose();
-        }
-    }
-
-    static final class NovaBar extends JComponent {
-        private int value; private boolean indeterminate;
-        void setValue(int v) { value = Math.max(0, Math.min(100, v)); repaint(); }
-        void setIndeterminate(boolean b) { indeterminate = b; repaint(); }
-        @Override protected void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D) g.create(); aa(g2);
-            int w = getWidth(), h = getHeight();
-            g2.setColor(new Color(255, 255, 255, 22)); g2.fillRoundRect(0, 0, w, h, h, h);
-            int bw, bx = 0;
-            if (indeterminate) { bw = w / 3; bx = (int) ((System.nanoTime() / 6_000_000L) % (w + bw)) - bw; }
-            else bw = w * value / 100;
-            if (bw > 0) {
-                g2.setClip(new RoundRectangle2D.Double(0, 0, w, h, h, h));
-                g2.setPaint(new GradientPaint(bx, 0, ACCENT, bx + bw, 0, CYAN));
-                g2.fillRoundRect(bx, 0, bw, h, h, h);
-            }
-            g2.dispose();
-        }
-    }
-
-    /** Shows the player's skin on a glowing platform with a gentle float animation. */
-    static final class SkinPanel extends JPanel {
-        private BufferedImage rendered = SkinRenderer.toImage(SkinRenderer.front(defaultSkin(), false), 1);
-
-        SkinPanel() { setOpaque(false); }
-        void setSkin(BufferedImage skin) { setSkin(skin, false); }
-        void setSkin(BufferedImage skin, boolean slim) {
-            rendered = SkinRenderer.toImage(SkinRenderer.front(skin == null ? defaultSkin() : skin, slim), 1);
-            repaint();
-        }
-
-        @Override protected void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D) g.create(); aa(g2);
-            int w = getWidth(), h = getHeight();
-            int scale = Math.max(2, Math.min((int) (w * 0.5) / SkinRenderer.W, (h - 70) / SkinRenderer.H));
-            int dw = SkinRenderer.W * scale, dh = SkinRenderer.H * scale;
-            double bob = Math.sin(System.nanoTime() / 6e8) * 4;
-            int x = (w - dw) / 2, floor = h - 14;
-            int top = (int) (floor - 12 - dh + bob);
-            // platform glow + disc
-            g2.setPaint(new RadialGradientPaint(new Point2D.Double(w / 2.0, floor), dw * 0.9f, new float[]{0f, 1f},
-                    new Color[]{alpha(CYAN, 110), alpha(CYAN, 0)}));
-            g2.fill(new Ellipse2D.Double(w / 2.0 - dw * 0.9, floor - dw * 0.22, dw * 1.8, dw * 0.44));
-            g2.setColor(new Color(15, 8, 40, 235)); g2.fill(new Ellipse2D.Double(w / 2.0 - dw * 0.6, floor - dw * 0.12, dw * 1.2, dw * 0.24));
-            g2.setColor(alpha(CYAN, 170)); g2.setStroke(new BasicStroke(2f));
-            g2.draw(new Ellipse2D.Double(w / 2.0 - dw * 0.6, floor - dw * 0.12, dw * 1.2, dw * 0.24));
-            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-            g2.drawImage(rendered, x, top, dw, dh, null);
             g2.dispose();
         }
     }

@@ -1,7 +1,8 @@
 package com.nova.client.module;
 
+import com.nova.client.compat.Mc;
+import com.nova.client.gui.Gfx;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
 import net.minecraft.item.ItemStack;
 
 /** Your equipped armor with remaining durability as a percentage. */
@@ -13,7 +14,7 @@ public class ArmorHudModule extends HudModule {
     private int count(MinecraftClient mc) {
         if (mc.player == null) return 0;
         int n = 0;
-        for (int i = 0; i < 4; i++) if (!mc.player.getInventory().getArmorStack(i).isEmpty()) n++;
+        for (int i = 0; i < 4; i++) if (!Mc.armor(mc.player, i).isEmpty()) n++;
         return n;
     }
 
@@ -21,7 +22,7 @@ public class ArmorHudModule extends HudModule {
     @Override protected int contentH(MinecraftClient mc) { return Hud.TITLE_H + Math.max(1, count(mc)) * 18 + 3; }
 
     @Override
-    protected void draw(DrawContext ctx, MinecraftClient mc) {
+    protected void draw(Gfx ctx, MinecraftClient mc) {
         int w = contentW(mc);
         Hud.titled(ctx, mc, 0, 0, w, contentH(mc), TITLE);
         if (count(mc) == 0) {
@@ -30,7 +31,7 @@ public class ArmorHudModule extends HudModule {
         }
         int y = Hud.TITLE_H + 2;
         for (int slot = 3; slot >= 0; slot--) { // helmet -> boots
-            ItemStack s = mc.player.getInventory().getArmorStack(slot);
+            ItemStack s = Mc.armor(mc.player, slot);
             if (s.isEmpty()) continue;
             ctx.drawItem(s, 4, y);
             if (s.getMaxDamage() > 0) {

@@ -1,11 +1,10 @@
 package com.nova.client.gui;
 
+import com.nova.client.compat.Mc;
 import com.nova.client.config.Config;
 import com.nova.client.friends.FriendsManager;
-import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.text.Text;
 
 import java.util.List;
 
@@ -24,12 +23,12 @@ public class FriendsScreen extends NovaScreen {
     @Override
     protected void build() {
         int x = px() + 16, w = W - 32;
-        TextFieldWidget field = new TextFieldWidget(textRenderer, x, py() + 34, w - 70, 20, Text.literal("Username"));
+        TextFieldWidget field = new TextFieldWidget(textRenderer, x, py() + 34, w - 70, 20, Mc.text("Username"));
         field.setMaxLength(16);
-        field.setPlaceholder(Text.literal("Add friend by username"));
+        hint(field, "Add friend by username");
         field.setText(input);
         field.setChangedListener(s -> input = s);
-        addDrawableChild(field);
+        addField(field);
 
         button(x + w - 65, py() + 34, 65, 20, "Add", true, () -> {
             String name = input;
@@ -39,7 +38,7 @@ public class FriendsScreen extends NovaScreen {
                 status = msg;
                 statusColor = msg.startsWith("Added") ? Ui.GREEN : Ui.RED;
                 if (msg.startsWith("Added")) input = "";
-                clearAndInit();
+                rebuild();
             });
         });
 
@@ -50,19 +49,19 @@ public class FriendsScreen extends NovaScreen {
             int ry = py() + 82 + i * ROW;
             button(px() + W - 40, ry + 1, 24, 18, "x", false, () -> {
                 FriendsManager.remove(f);
-                clearAndInit();
+                rebuild();
             });
         }
-        button(width / 2 - 50, py() + 82 + VISIBLE * ROW + 30, 100, 22, "Back", false, this::close);
+        button(width / 2 - 50, py() + 82 + VISIBLE * ROW + 30, 100, 22, "Back", false, this::nClose);
     }
 
     @Override
-    protected void drawBack(DrawContext ctx, int mx, int my, float delta) {
+    protected void drawBack(Gfx ctx, int mx, int my, float delta) {
         Ui.card(ctx, px(), py(), W, 82 + VISIBLE * ROW + 22);
     }
 
     @Override
-    protected void drawFront(DrawContext ctx, int mx, int my, float delta) {
+    protected void drawFront(Gfx ctx, int mx, int my, float delta) {
         ctx.drawTextWithShadow(textRenderer, "Friends", px() + 16, py() + 12, Ui.ACCENT);
         ctx.drawTextWithShadow(textRenderer, textRenderer.trimToWidth(status, W - 100), px() + 70, py() + 12, statusColor);
 
@@ -87,9 +86,9 @@ public class FriendsScreen extends NovaScreen {
     }
 
     @Override
-    public boolean mouseScrolled(double mx, double my, double horizontal, double vertical) {
+    protected boolean nScroll(double mx, double my, double horizontal, double vertical) {
         scroll -= (int) Math.signum(vertical);
-        clearAndInit();
+        rebuild();
         return true;
     }
 }

@@ -1,5 +1,6 @@
 package com.nova.client.mixin;
 
+//#if MC >= 1900
 import net.minecraft.client.option.SimpleOption;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
@@ -10,3 +11,4 @@ public interface SimpleOptionAccessor<T> {
     @Accessor("value")
     void novaSetRawValue(T value);
 }
+//#endif

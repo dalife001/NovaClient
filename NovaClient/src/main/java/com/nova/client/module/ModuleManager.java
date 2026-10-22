@@ -1,8 +1,8 @@
 package com.nova.client.module;
 
+import com.nova.client.gui.Gfx;
 import com.nova.client.config.Config;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -10,7 +10,6 @@ import java.util.List;
 
 public class ModuleManager {
     private final List<Module> modules = new ArrayList<>();
-    public final FreecamModule freecam = new FreecamModule();
     public final ZoomModule zoom = new ZoomModule();
     public final FullbrightModule fullbright = new FullbrightModule();
     public final LowFireModule lowFire = new LowFireModule();
@@ -33,7 +32,6 @@ public class ModuleManager {
         modules.add(new ModuleListModule());
         modules.add(new ToggleSprintModule());
         modules.add(zoom);
-        modules.add(freecam);
         modules.add(fullbright);
         modules.add(crosshair);
         modules.add(lowFire);
@@ -47,7 +45,8 @@ public class ModuleManager {
                 Double v = cfg.settings.get(m.name + "/" + s.name);
                 if (v != null) s.set(v);
             }
-            if (m instanceof HudModule h) {
+            if (m instanceof HudModule) {
+                HudModule h = (HudModule) m;
                 List<Double> p = cfg.hud.get(m.name);
                 if (p != null && p.size() == 4) {
                     h.offX = p.get(0).floatValue();
@@ -73,8 +72,9 @@ public class ModuleManager {
         for (Module m : modules) {
             if (m.persistent()) cfg.modules.put(m.name, m.isEnabled());
             for (NumberSetting s : m.settings) cfg.settings.put(m.name + "/" + s.name, s.get());
-            if (m instanceof HudModule h) {
-                cfg.hud.put(m.name, List.of((double) h.offX, (double) h.offY, h.right ? 1.0 : 0.0, h.bottom ? 1.0 : 0.0));
+            if (m instanceof HudModule) {
+                HudModule h = (HudModule) m;
+                cfg.hud.put(m.name, java.util.Arrays.asList((double) h.offX, (double) h.offY, h.right ? 1.0 : 0.0, h.bottom ? 1.0 : 0.0));
             }
         }
         Config.save();
@@ -84,7 +84,7 @@ public class ModuleManager {
         for (Module m : modules) if (m.isEnabled()) m.onTick(mc);
     }
 
-    public void onRender(DrawContext ctx, MinecraftClient mc) {
+    public void onRender(Gfx ctx, MinecraftClient mc) {
         for (Module m : modules) if (m.isEnabled()) m.onRender(ctx, mc);
     }
 }

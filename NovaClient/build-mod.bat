@@ -37,7 +37,7 @@ if errorlevel 1 (
 echo.
 echo ================================================================
 echo  Done! Your mod jar is here:
-echo  %cd%\build\libs\novaclient-0.4.0.jar
+echo  %cd%\build\libs\novaclient-*.jar (the one without -sources or -dev)
 echo  ^(NOT the one ending in -sources or -dev^)
 echo  In Nova Launcher: Settings ^> Local Nova jar ^> pick that file ^> Save ^> PLAY
 echo ================================================================

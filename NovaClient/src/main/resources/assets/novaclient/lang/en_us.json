@@ -1,6 +1,6 @@
 {
   "key.novaclient.open_gui": "Open Client Settings",
-  "key.novaclient.freecam": "Toggle Freecam",
   "key.novaclient.zoom": "Zoom (hold)",
-  "category.novaclient": "Nova Client"
+  "category.novaclient": "Nova Client",
+  "key.category.novaclient.main": "Nova Client"
 }

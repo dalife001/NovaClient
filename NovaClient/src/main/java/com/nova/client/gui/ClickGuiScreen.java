@@ -1,13 +1,12 @@
 package com.nova.client.gui;
 
+import com.nova.client.compat.Mc;
 import com.nova.client.NovaClient;
 import com.nova.client.module.HudModule;
 import com.nova.client.module.Module;
 import com.nova.client.module.NumberSetting;
-import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -37,20 +36,20 @@ public class ClickGuiScreen extends NovaScreen {
 
     @Override
     protected void build() {
-        field = new TextFieldWidget(textRenderer, 0, 0, 120, 16, Text.literal("Search"));
-        field.setPlaceholder(Text.literal("Search modules"));
+        field = new TextFieldWidget(textRenderer, 0, 0, 120, 16, Mc.text("Search"));
+        hint(field, "Search modules");
         field.setText(search);
         field.setChangedListener(s -> { search = s; scrollTarget = 0; });
-        addDrawableChild(field);
+        addField(field);
 
         editorBtn = button(0, 0, 86, 16, "HUD Editor", AnimButton.Style.SECONDARY, () -> {
-            if (client.player != null) client.setScreen(new HudEditorScreen(this));
+            if (client.player != null) Mc.setScreen(client, new HudEditorScreen(this));
         });
         editorBtn.enabled = client.player != null;
 
         toggleBtn = new AnimButton(0, 0, DW - 20, 20, "", AnimButton.Style.SECONDARY, () -> { if (selected != null) toggle(selected); });
         resetBtn = new AnimButton(0, 0, DW - 20, 18, "Reset position", AnimButton.Style.SECONDARY, () -> {
-            if (selected instanceof HudModule h) { h.resetPosition(); NovaClient.modules.saveStates(); }
+            if (selected instanceof HudModule) { ((HudModule) selected).resetPosition(); NovaClient.modules.saveStates(); }
         });
     }
 
@@ -97,14 +96,14 @@ public class ClickGuiScreen extends NovaScreen {
     }
 
     @Override
-    public void renderBackground(DrawContext ctx, int mx, int my, float delta) {
+    protected void nBackground(Gfx ctx, int mx, int my, float delta) {
         if (parent != null) Ui.background(ctx, width, height);
         else ctx.fillGradient(0, 0, width, height, 0xB0070716, 0xD0120E2C); // see-through when in-game
         drawBack(ctx, mx, my, delta);
     }
 
     @Override
-    protected void drawBack(DrawContext ctx, int mx, int my, float delta) {
+    protected void drawBack(Gfx ctx, int mx, int my, float delta) {
         long now = System.nanoTime();
         dt = Math.min(0.1f, (now - last) / 1e9f);
         last = now;
@@ -118,11 +117,11 @@ public class ClickGuiScreen extends NovaScreen {
 
         editorBtn.x = px + pw - 12 - editorBtn.w;
         editorBtn.y = py + 7;
-        field.setPosition(editorBtn.x - 8 - 120, py + 7);
+        place(field, editorBtn.x - 8 - 120, py + 7);
     }
 
     @Override
-    protected void drawFront(DrawContext ctx, int mx, int my, float delta) {
+    protected void drawFront(Gfx ctx, int mx, int my, float delta) {
         Ui.text(ctx, textRenderer, "Modules", px + 24, py + 11, Ui.TEXT, 1f);
         Ui.sparkle(ctx, px + 16, py + 15, 2, Ui.a(Theme.light(Ui.CYAN), 0.6f + 0.4f * Anim.breathe(4f, 0f)));
 
@@ -199,7 +198,7 @@ public class ClickGuiScreen extends NovaScreen {
         drawDrawer(ctx, mx, my);
     }
 
-    private void drawDrawer(DrawContext ctx, int mx, int my) {
+    private void drawDrawer(Gfx ctx, int mx, int my) {
         if (selected == null || drawer < 0.03f) return;
         float a = drawer;
         int dx = px + pw - 14 - DW + (int) ((1f - a) * 24), dy = gy;
@@ -237,7 +236,7 @@ public class ClickGuiScreen extends NovaScreen {
 
     // ---------------- input ----------------
     @Override
-    public boolean mouseClicked(double mx, double my, int button) {
+    protected boolean nClick(double mx, double my, int button) {
         if (button == 0) {
             layout();
             // tabs
@@ -279,43 +278,43 @@ public class ClickGuiScreen extends NovaScreen {
                 }
             }
         }
-        return super.mouseClicked(mx, my, button);
+        return super.nClick(mx, my, button);
     }
 
     @Override
-    public boolean mouseDragged(double mx, double my, int button, double dX, double dY) {
+    protected boolean nDrag(double mx, double my, int button, double dX, double dY) {
         if (dragging != null) {
             dragging.setFraction((mx - dragX) / dragW);
             return true;
         }
-        return super.mouseDragged(mx, my, button, dX, dY);
+        return super.nDrag(mx, my, button, dX, dY);
     }
 
     @Override
-    public boolean mouseReleased(double mx, double my, int button) {
+    protected boolean nRelease(double mx, double my, int button) {
         if (dragging != null) {
             dragging = null;
             NovaClient.modules.saveStates();
             return true;
         }
-        return super.mouseReleased(mx, my, button);
+        return super.nRelease(mx, my, button);
     }
 
     @Override
-    public boolean mouseScrolled(double mx, double my, double h, double v) {
+    protected boolean nScroll(double mx, double my, double h, double v) {
         if (Ui.inside(mx, my, gx, gy, gw, gh)) {
             scrollTarget = Math.max(0, Math.min(maxScroll(), scrollTarget - (float) v * 30f));
             return true;
         }
-        return super.mouseScrolled(mx, my, h, v);
+        return super.nScroll(mx, my, h, v);
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == GLFW.GLFW_KEY_RIGHT_SHIFT && !field.isFocused()) { close(); return true; }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+    protected boolean nKey(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_RIGHT_SHIFT && !field.isFocused()) { nClose(); return true; }
+        return super.nKey(keyCode, scanCode, modifiers);
     }
 
     @Override
-    public boolean shouldPause() { return false; }
+    protected boolean pausesGame() { return false; }
 }

@@ -21,6 +21,12 @@ final class LauncherConfig {
     int ramMb = 4096;
     /** Colour palette index (0 Nova, 1 Ocean, 2 Sunset, 3 Emerald, 4 Rose). Shared with the game. */
     int theme = 0;
+    /** Load the Nova Client mod. Off = plain Fabric (useful to check a version without Nova). */
+    boolean useNova = true;
+    /** Optional mods the player ticked, as comma separated Modrinth slugs: sodium, iris, freecam. */
+    String optionalMods = "";
+    /** True once the player has seen the "Choose your mods" window. */
+    boolean optionalChosen = false;
 
     static Path file() { return Platform.home().resolve("launcher.json"); }
 
@@ -40,6 +46,9 @@ final class LauncherConfig {
                 long r = Json.num(m, "ramMb");
                 if (r >= 1024) c.ramMb = (int) r;
                 c.theme = (int) Math.max(0, Math.min(4, Json.num(m, "theme")));
+                if (m.get("useNova") instanceof Boolean ub) c.useNova = ub;
+                c.optionalMods = s(m, "optionalMods", c.optionalMods);
+                if (m.get("optionalChosen") instanceof Boolean oc) c.optionalChosen = oc;
             }
         } catch (Exception ignored) {}
         return c;
@@ -64,6 +73,9 @@ final class LauncherConfig {
             m.put("javaPath", javaPath);
             m.put("ramMb", (double) ramMb);
             m.put("theme", (double) theme);
+            m.put("useNova", useNova);
+            m.put("optionalMods", optionalMods);
+            m.put("optionalChosen", optionalChosen);
             Files.writeString(file(), Json.write(m));
         } catch (Exception e) {
             e.printStackTrace();

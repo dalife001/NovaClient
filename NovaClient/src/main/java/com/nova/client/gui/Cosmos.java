@@ -1,6 +1,5 @@
 package com.nova.client.gui;
 
-import net.minecraft.client.gui.DrawContext;
 
 import java.util.Random;
 
@@ -26,7 +25,7 @@ public final class Cosmos {
     private Cosmos() {}
 
     /** Full scene: sky, stars, aurora, shooting star, mist, hills. */
-    public static void scene(DrawContext c, int w, int h, float dx, float dy) {
+    public static void scene(Gfx c, int w, int h, float dx, float dy) {
         float t = Anim.seconds();
         int mid = Anim.lerpColor(Ui.SKY_TOP, Ui.SKY_BOT, 0.42f);
         int split = (int) (h * 0.62f);
@@ -42,7 +41,7 @@ public final class Cosmos {
     }
 
     /** Twinkling stars in three depth layers; the biggest ones sparkle. */
-    public static void stars(DrawContext c, int w, int h, float dx, float dy, float strength) {
+    public static void stars(Gfx c, int w, int h, float dx, float dy, float strength) {
         float t = Anim.seconds();
         for (int i = 0; i < N; i++) {
             float z = SZ[i];
@@ -58,7 +57,7 @@ public final class Cosmos {
     }
 
     /** Slow curtains of light. Three ribbons, each a row of soft vertical gradients. */
-    private static void aurora(DrawContext c, int w, int h, float dx, float t) {
+    private static void aurora(Gfx c, int w, int h, float dx, float t) {
         int[] cols = {Ui.AUR1, Ui.AUR2, Ui.AUR3};
         int step = 4;
         for (int k = 0; k < 3; k++) {
@@ -81,7 +80,7 @@ public final class Cosmos {
     }
 
     /** One slow streak every 17 seconds. */
-    private static void shootingStar(DrawContext c, int w, int h, float t) {
+    private static void shootingStar(Gfx c, int w, int h, float t) {
         float cyc = t % 17f;
         if (cyc > 1.1f) return;
         int seed = (int) (t / 17f);
@@ -97,7 +96,7 @@ public final class Cosmos {
     }
 
     /** Three layers of rolling hills, lighter and mistier the further away. */
-    private static void hills(DrawContext c, int w, int h, float dx, float t) {
+    private static void hills(Gfx c, int w, int h, float dx, float t) {
         int far = Anim.lerpColor(Ui.SKY_BOT, Ui.ACCENT, 0.34f);
         int mid = Anim.lerpColor(Ui.SKY_BOT, Ui.SKY_TOP, 0.42f);
         int near = Anim.lerpColor(Ui.SKY_TOP, 0xFF000000, 0.55f);
@@ -117,7 +116,7 @@ public final class Cosmos {
     }
 
     /** A few warm fireflies drifting over the hills. */
-    private static void fireflies(DrawContext c, int w, int h, float dx, float t) {
+    private static void fireflies(Gfx c, int w, int h, float dx, float t) {
         for (int i = 0; i < 16; i++) {
             float ph = Anim.hash(i * 7 + 3) * 6.283f;
             float fx = (Anim.hash(i * 5 + 1) * w + (float) Math.sin(t * 0.21f + ph) * 18f - dx * 20f);
@@ -134,7 +133,7 @@ public final class Cosmos {
 
     // ---------- the planet ----------
     /** A slowly turning banded planet with a ring and a small orbiting moon. */
-    public static void planet(DrawContext c, int cx, int cy, int r, float alpha) {
+    public static void planet(Gfx c, int cx, int cy, int r, float alpha) {
         if (alpha <= 0.02f || r < 8) return;
         float t = Anim.seconds();
         float breath = 0.75f + 0.25f * (float) Math.sin(t * 0.5f);
@@ -156,7 +155,7 @@ public final class Cosmos {
     }
 
     /** Lit sphere: each scanline is a few soft steps from the lit side to the shadow side. */
-    private static void body(DrawContext c, int cx, int cy, int r, float t, float alpha) {
+    private static void body(Gfx c, int cx, int cy, int r, float t, float alpha) {
         int lit = Anim.lerpColor(Ui.ACCENT, 0xFFFFFFFF, 0.45f);
         int dark = Anim.lerpColor(Ui.ACCENT_DARK, 0xFF05050F, 0.62f);
         // light comes from the upper left, a little towards the viewer
@@ -188,7 +187,7 @@ public final class Cosmos {
         }
     }
 
-    private static void ring(DrawContext c, int cx, int cy, int r, float alpha, boolean front) {
+    private static void ring(Gfx c, int cx, int cy, int r, float alpha, boolean front) {
         float tilt = -0.32f;
         float cos = (float) Math.cos(tilt), sin = (float) Math.sin(tilt);
         float rx = r * 1.95f, ry = r * 0.38f;
@@ -207,7 +206,7 @@ public final class Cosmos {
         }
     }
 
-    private static void moon(DrawContext c, int cx, int cy, int r, float alpha) {
+    private static void moon(Gfx c, int cx, int cy, int r, float alpha) {
         Ui.glow(c, cx, cy, r * 3, r * 3, 0xFFFFFF, 0.14f * alpha);
         for (int dy = -r; dy < r; dy++) {
             double yy = dy + 0.5;

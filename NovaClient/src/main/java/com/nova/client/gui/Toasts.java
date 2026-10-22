@@ -1,7 +1,6 @@
 package com.nova.client.gui;
 
 import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -9,7 +8,13 @@ import java.util.List;
 
 /** Little notifications that slide in from the right. Safe to call from any thread. */
 public final class Toasts {
-    private record Toast(String title, String msg, int color, long born) {}
+    private static final class Toast {
+        final String title, msg;
+        final int color;
+        final long born;
+
+        Toast(String title, String msg, int color, long born) { this.title = title; this.msg = msg; this.color = color; this.born = born; }
+    }
 
     private static final List<Toast> LIST = new ArrayList<>();
     private static final long LIFE = 3400, IN = 450, OUT = 500;
@@ -23,7 +28,7 @@ public final class Toasts {
         }
     }
 
-    public static void render(DrawContext c, TextRenderer tr, int w, int h) {
+    public static void render(Gfx c, TextRenderer tr, int w, int h) {
         long now = System.currentTimeMillis();
         synchronized (LIST) {
             int y = 30;

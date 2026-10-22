@@ -2,11 +2,47 @@
 
 ```
 Nova/
-  NovaClient/     the Fabric mod (menu, freecam, accounts, skins, friends, modules...)
+  NovaClient/     the Fabric mod (menu, accounts, skins, friends, modules...)
   NovaLauncher/   the desktop app that installs Minecraft + Fabric + Nova and starts it
   NovaLauncher.jar   ready-to-run launcher (needs Java 21+)
   .github/        auto-release pipeline
 ```
+
+
+## What is new in v6: every Minecraft version, built automatically
+
+Click **minecraft 1.21.4 v** in the launcher (top left) to pick any release from **1.16.5 up to 1.21.11** (the range where the client can be built; see "Which versions" below).
+Press Play and the launcher installs that Minecraft + Fabric + Fabric API and, if there is one, the Nova Client build made for that exact version.
+
+- **Fabric only** next to a version = no Nova build for it yet. It still starts as plain Fabric, so the version is always playable.
+- **Nova (experimental)** = the build compiled in CI but nobody has played it yet. Mixins that do not fit are skipped instead of crashing the game.
+- The **cube icon** in the bottom dock opens **Mods**: switch any mod on/off, import jars (button or drag and drop), remove them.
+  Mods that need a different Minecraft version are marked, and the launcher switches them off before starting so Fabric never shows "Incompatible mods found".
+- Settings has a **Load Nova Client** switch (off = plain Fabric) if a version misbehaves.
+
+**You never build the client by hand.** `.github/workflows/release.yml` does it on GitHub:
+
+1. `tools/ci/discover.py` asks Fabric which stable versions exist (1.16.5 up to the newest with Yarn mappings), finds the Yarn mappings and Fabric API for each, and asks Mojang which Java each needs.
+2. One build job per version compiles Nova with `gradle build -Pminecraft_version=... -Pyarn_mappings=... -Pfabric_version=... -Pjava_version=...`.
+   A version whose code does not compile yet is skipped (listed in the run summary), the rest ship.
+3. `tools/ci/make_manifest.py` writes `latest.json` with one entry per version (`builds`) and publishes the release.
+
+It runs when you push a tag (`git tag v0.7.0 && git push --tags`), by hand (Actions > Release > Run workflow, optionally for a few versions), and **every Monday**,
+which picks up newly released Minecraft versions without you doing anything. Put `tools/tested-versions.txt` to use: list a version there once you have played it and it loses the "experimental" label.
+
+The code in `NovaClient/src` is written against 1.21.4. Where Mojang changed something between versions the build for that version fails and is skipped;
+fixing it means adding a small version check in the code (or splitting the file) and the next run picks it up. Nothing else changes.
+
+Where it lives: `VersionList` (picker data), `NovaManifest` (latest.json), `NovaUpdater.installNova` (right jar per version, removes the others),
+`Installer` (now also unpacks old-style natives and uses Mojang's log4j config, needed for 1.14 - 1.18).
+Sodium, Iris and Freecam are **not** part of the client any more. The launcher shows a **Choose your mods** window (first Play, and later under Mods > *Sodium / Iris / Freecam...*). Tick what you want; on Play the launcher downloads the matching build for the selected Minecraft version from Modrinth and removes the ones you switched off. Iris automatically brings Sodium. If a mod has no build for a version it says so and starts without it.
+
+### Which versions get a client jar
+One source tree builds for every version from **1.16.5 to 1.21.11**. Code that differs between versions sits between `//#if MC >= 2000 ... //#else ... //#endif` markers (MC = minor*100+patch, so 1.20 = 2000, 1.21.4 = 2104); Gradle's `preprocess` task keeps the matching branch before compiling. All the version-specific Minecraft calls are in `compat/Mc.java`, `gui/Gfx.java`, `gui/NovaScreen.java` and the mixins.
+- 1.14 and 1.15 are not built: their Fabric API and rendering are too different (no MatrixStack / events).
+- 26.x and newer have no Yarn mappings (Mojang stopped obfuscating), so they need a Loom port first.
+- Custom background images need 1.20+; older versions use the built-in night sky.
+- Version 1.21.4 is the only one marked *tested*. Every other version is built with lenient mixins so a changed Minecraft method is skipped instead of crashing. If a version fails to compile, the release run saves `FAILED-log-<version>` as an artifact with the Gradle log.
 
 
 ## What is new in v3 (Nova Serenity, client 0.6.0)
@@ -80,7 +116,7 @@ HUD panels (Potion Status, Armor Status, Coordinates) use titled glass panels. S
 - **Module menu** (Right Shift): search, tabs, animated cards, per-module settings (sliders).
 - **HUD editor**: drag elements anywhere (edges and centre snap), scroll over one to resize.
 - **HUD**: FPS, Ping, CPS, Coordinates, Direction, Clock, Keystrokes (animated), Armor, Potion Status.
-- **Camera**: Zoom (hold C, adjustable level) and Freecam (F6, adjustable speed).
+- **Camera**: Zoom (hold C, adjustable level). Freecam is available as an optional mod from the launcher.
 - **Toasts** slide in for toggles, logins, updates. Custom wallpaper with slow zoom + mouse parallax.
 
 ## Quick start (no GitHub needed)
@@ -100,9 +136,8 @@ HUD panels (Potion Status, Armor Status, Coordinates) use titled glass panels. S
    removes the old one, refreshes Fabric API, and starts. The in-game menu also shows an "Update available" card.
 
 What updates by itself: Nova, Fabric API, Fabric Loader, Minecraft files, even the Java runtime.
-What needs you once per Minecraft release: bump `minecraft_version`, `yarn_mappings`, `fabric_version`,
-`sodium_version`, `iris_version` in `NovaClient/gradle.properties`, fix any code that Mojang renamed, then tag.
-When `latest.json` says a new `minecraft` version, every launcher moves to it automatically.
+What needs you once per Minecraft release: nothing for the pipeline (it finds the new version by itself). If the new version does not
+compile, fix the code that Mojang renamed and tag again. `latest.json` names the default Minecraft version, and every launcher set to "automatic" moves to it.
 
 ## Login
 Create a free Azure app (personal accounts, "Allow public client flows"), paste its client ID in
@@ -118,4 +153,4 @@ jpackage --type exe --name "Nova Launcher" --input . --main-jar NovaLauncher.jar
 Use `--type dmg` on macOS, `--type deb` on Linux (jpackage must run on the target OS).
 
 ## Licenses
-Sodium: PolyForm Shield 1.0.0. Iris: LGPL-3.0. Keep their notices when distributing.
+Sodium, Iris and Freecam are downloaded from Modrinth on request and keep their own licenses; Nova does not redistribute them.

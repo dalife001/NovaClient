@@ -3,12 +3,11 @@ package com.nova.client.friends;
 import com.google.gson.JsonObject;
 import com.nova.client.account.MicrosoftAuth;
 import com.nova.client.config.Config;
+import com.nova.client.util.Net;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.client.network.PlayerListEntry;
 
-import java.net.URI;
-import java.net.http.HttpRequest;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -32,8 +31,7 @@ public final class FriendsManager {
         Thread t = new Thread(() -> {
             String msg;
             try {
-                JsonObject o = MicrosoftAuth.send(HttpRequest.newBuilder(
-                        URI.create("https://api.mojang.com/users/profiles/minecraft/" + trimmed)).GET().build());
+                JsonObject o = MicrosoftAuth.send(Net.get("https://api.mojang.com/users/profiles/minecraft/" + trimmed));
                 if (o.has("id") && o.has("name")) {
                     String id = o.get("id").getAsString();
                     String real = o.get("name").getAsString();

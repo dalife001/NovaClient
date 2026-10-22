@@ -10,25 +10,93 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 /**
- * Keeps the mods folder up to date: the newest Nova Client (from your latest.json),
- * and the newest Fabric API for the Minecraft version Nova targets.
+ * Keeps the mods folder matched to the chosen Minecraft version: the Nova Client build for that version
+ * (from your latest.json) and the newest Fabric API for it.
  */
 final class NovaUpdater {
     private NovaUpdater() {}
 
     static final String DEFAULT_MC = "1.21.4";
 
-    record Result(String mcVersion, String novaVersion, String latestLauncher, String launcherUrl) {}
+    record Result(String mcVersion, String novaVersion, String latestLauncher, String launcherUrl, boolean novaLoaded) {}
+
+    /** What the launcher plays when nothing is forced: the manifest's default, else the built-in mod's, else DEFAULT_MC. */
+    static String defaultMc(NovaManifest man, Embedded emb) {
+        if (man != null && man.defaultMc() != null) return man.defaultMc();
+        if (emb != null) return emb.minecraft;
+        return DEFAULT_MC;
+    }
+
+    /** File name a Nova jar gets inside the mods folder. The Minecraft version is part of it so builds never get mixed up. */
+    static String jarName(String version, String mc) { return "novaclient-" + version + "-mc" + mc + ".jar"; }
+
+    record Pick(String novaVersion, boolean loaded) {}
 
     static Result sync(LauncherConfig cfg, Path gameDir, Progress p) throws Exception {
         Path mods = gameDir.resolve("mods");
         Files.createDirectories(mods);
-        boolean forcedMc = !cfg.mcVersion.isBlank();
-        String mc = forcedMc ? cfg.mcVersion : DEFAULT_MC;
-        String novaVersion = installedNova(mods);
-        String launcherLatest = null, launcherUrl = null;
         Embedded emb = Embedded.load();
 
+        NovaManifest man = null;
+        if (!cfg.manifestUrl.isBlank()) {
+            try {
+                p.status("Checking for Nova Client updates...");
+                man = NovaManifest.fetch(cfg.manifestUrl);
+            } catch (Exception e) {
+                p.status("Update check failed (" + e.getMessage() + "); using what is already installed");
+            }
+        }
+        String mc = chooseMc(cfg, man, emb, mods);
+
+        Pick pick = installNova(cfg, man, emb, mc, mods, p);
+
+        // Sodium / Iris / Freecam: whatever the player ticked, for this Minecraft version.
+        OptionalMods.sync(cfg, mc, mods, p);
+
+        // Fabric refuses to start if any mod needs another Minecraft version, so switch those off first.
+        // Sodium / Iris / Freecam: exactly what the player ticked, for this Minecraft version
+        OptionalMods.sync(cfg, mc, mods, p);
+        for (String line : ModScan.disableIncompatible(mods, mc)) p.status(line);
+        boolean loaded = pick.loaded() && ModScan.novaEnabled(mods);
+        String novaVersion = pick.novaVersion() + (pick.loaded() && !loaded ? " (skipped: built for another Minecraft version)" : "");
+
+        try {
+            fabricApi(mc, mods, p);
+        } catch (IOException e) {
+            // Keep only a Fabric API that belongs to this Minecraft version; anything else would stop the game from starting.
+            deleteNotContaining(mods, "fabric-api-", mc);
+            if (loaded && !hasFile(mods, "fabric-api-")) throw e;
+            p.status("Could not check Fabric API updates; using the installed one");
+        }
+        return new Result(mc, novaVersion, man == null ? null : man.launcherVersion(), man == null ? null : man.launcherUrl(), loaded);
+    }
+
+    /**
+     * Which Minecraft version to play: the one you picked; else the version your own Nova jar was built for;
+     * else what the update manifest / built-in mod says.
+     */
+    static String chooseMc(LauncherConfig cfg, NovaManifest man, Embedded emb, Path mods) {
+        if (!cfg.mcVersion.isBlank()) return cfg.mcVersion;
+        try {
+            if (!cfg.localModJar.isBlank()) {
+                JarInfo i = JarInfo.read(Path.of(cfg.localModJar));
+                if (i != null && i.mcHint() != null) return i.mcHint();
+            } else if (man == null && emb == null && Files.isDirectory(mods)) {
+                try (Stream<Path> s = Files.list(mods)) {
+                    for (Path f : (Iterable<Path>) s::iterator) {
+                        String n = f.getFileName().toString();
+                        if (!n.startsWith("novaclient-") || !n.endsWith(".jar")) continue;
+                        JarInfo i = JarInfo.read(f);
+                        if (i != null && i.mcHint() != null) return i.mcHint();
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return defaultMc(man, emb);
+    }
+
+    /** Puts the right Nova jar for this Minecraft version into the mods folder (and removes every other one). */
+    static Pick installNova(LauncherConfig cfg, NovaManifest man, Embedded emb, String mc, Path mods, Progress p) throws IOException {
         if (!cfg.localModJar.isBlank()) {
             // developer override: always use this exact jar
             Path src = Path.of(cfg.localModJar);
@@ -36,53 +104,87 @@ final class NovaUpdater {
             Path dest = mods.resolve("novaclient-dev.jar");
             deleteOthers(mods, "novaclient-", dest.getFileName().toString());
             Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING);
-            novaVersion = "dev (local jar)";
             p.status("Using your local Nova Client jar");
-        } else {
-            boolean done = false;
-            if (!cfg.manifestUrl.isBlank()) {
-                try {
-                    p.status("Checking for Nova Client updates...");
-                    Map<String, Object> m = Http.getJson(cfg.manifestUrl);
-                    Map<String, Object> l = Json.o(m.get("launcher"));
-                    launcherLatest = Json.str(l, "version");
-                    launcherUrl = Json.str(l, "url");
-                    Map<String, Object> mod = Json.o(m.get("mod"));
-                    String ver = Json.str(m, "version");
-                    String url = Json.str(mod, "url");
-                    // only download when the online version is newer than the one built into this app
-                    if (ver != null && url != null && (emb == null || Versions.cmp(ver, emb.version) > 0)) {
-                        String name = "novaclient-" + ver + ".jar";
-                        p.status("Updating Nova Client to " + ver + "...");
-                        Http.download(url, mods.resolve(name), "SHA-256", Json.str(mod, "sha256"));
-                        deleteOthers(mods, "novaclient-", name);
-                        novaVersion = ver;
-                        if (!forcedMc && Json.str(m, "minecraft") != null) mc = Json.str(m, "minecraft");
-                        done = true;
-                    }
-                } catch (IOException e) {
-                    p.status("Update check failed (" + e.getMessage() + "); using the built-in version");
-                }
-            }
-            if (!done) {
-                if (emb != null) {
-                    try (InputStream in = emb.jar()) { installJar(in, mods, emb.version); }
-                    novaVersion = emb.version + " (built in)";
-                    if (!forcedMc) mc = emb.minecraft;
-                    p.status("Nova Client " + emb.version + " is ready");
-                } else {
-                    p.status("No built-in Nova Client; using whatever is in the mods folder");
-                }
-            }
+            return new Pick("dev (local jar)", true);
+        }
+        if (!cfg.useNova) {
+            retire(mods);
+            p.status("Nova Client is switched off in Settings: starting plain Fabric");
+            return new Pick("switched off", false);
         }
 
-        try {
-            fabricApi(mc, mods, p);
-        } catch (IOException e) {
-            if (!hasFile(mods, "fabric-api-")) throw e;
-            p.status("Could not check Fabric API updates; using the installed one");
+        NovaManifest.Build b = man == null ? null : man.builds().get(mc);
+        boolean embMatches = emb != null && mc.equals(emb.minecraft);
+        if (b != null && man.version() != null && (!embMatches || Versions.cmp(man.version(), emb.version) > 0)) {
+            String name = jarName(man.version(), mc);
+            try {
+                p.status("Getting Nova Client " + man.version() + " for Minecraft " + mc + "...");
+                Http.download(b.url(), mods.resolve(name), "SHA-256", b.sha256());
+                deleteOthers(mods, "novaclient-", name);
+                return new Pick(man.version() + (b.tested() ? "" : " (experimental on " + mc + ")"), true);
+            } catch (IOException | InterruptedException e) {
+                p.status("Could not download Nova Client (" + e.getMessage() + ")");
+            }
         }
-        return new Result(mc, novaVersion, launcherLatest, launcherUrl);
+        if (embMatches) {
+            try (InputStream in = emb.jar()) { installJar(in, mods, emb.version + "-mc" + mc); }
+            p.status("Nova Client " + emb.version + " is ready");
+            return new Pick(emb.version + " (built in)", true);
+        }
+        String cached = cachedFor(mods, mc);
+        if (cached != null) {
+            deleteOthers(mods, "novaclient-", cached);
+            p.status("Using the Nova Client already installed for " + mc);
+            return new Pick("installed copy", true);
+        }
+        if (manualJar(mods)) {
+            p.status("Using the Nova jar you put in the mods folder (not managed by the launcher)");
+            return new Pick("your own jar", true);
+        }
+        deleteOthers(mods, "novaclient-", "");
+        p.status("There is no Nova Client build for Minecraft " + mc + " yet: starting plain Fabric");
+        return new Pick("none for " + mc, false);
+    }
+
+    /** True if the mods folder has a Nova jar the launcher did not create (for example one you built yourself). */
+    static boolean manualJar(Path mods) throws IOException {
+        try (Stream<Path> s = Files.list(mods)) {
+            for (Path f : (Iterable<Path>) s::iterator) {
+                String n = f.getFileName().toString();
+                if (n.startsWith("novaclient-") && n.endsWith(".jar") && !n.contains("-mc")) return true;
+            }
+        }
+        try (Stream<Path> s = Files.list(mods)) {          // switched back on: bring a retired jar back
+            for (Path f : (Iterable<Path>) s::iterator) {
+                String n = f.getFileName().toString();
+                if (n.startsWith("novaclient-") && n.endsWith(".jar.disabled") && !n.contains("-mc")) {
+                    Files.move(f, f.resolveSibling(n.substring(0, n.length() - ".disabled".length())), StandardCopyOption.REPLACE_EXISTING);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Nova switched off: launcher-managed jars are deleted, a jar you made yourself is only renamed so it is not lost. */
+    static void retire(Path mods) throws IOException {
+        try (Stream<Path> s = Files.list(mods)) {
+            for (Path f : (Iterable<Path>) s::iterator) {
+                String n = f.getFileName().toString();
+                if (!n.startsWith("novaclient-") || !n.endsWith(".jar")) continue;
+                if (n.contains("-mc")) Files.deleteIfExists(f);
+                else Files.move(f, f.resolveSibling(n + ".disabled"), StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
+    }
+
+    /** A Nova jar already in the mods folder that was built for this Minecraft version. */
+    private static String cachedFor(Path mods, String mc) throws IOException {
+        try (Stream<Path> s = Files.list(mods)) {
+            return s.map(f -> f.getFileName().toString())
+                    .filter(n -> n.startsWith("novaclient-") && n.endsWith("-mc" + mc + ".jar"))
+                    .findFirst().orElse(null);
+        }
     }
 
     /** Writes the built-in mod jar into the mods folder and removes older Nova jars. */
@@ -120,26 +222,27 @@ final class NovaUpdater {
         deleteOthers(mods, "fabric-api-", name);
     }
 
-    private static String installedNova(Path mods) throws IOException {
-        try (Stream<Path> s = Files.list(mods)) {
-            return s.map(f -> f.getFileName().toString())
-                    .filter(n -> n.startsWith("novaclient-") && n.endsWith(".jar"))
-                    .map(n -> n.substring("novaclient-".length(), n.length() - 4))
-                    .findFirst().orElse("not installed");
-        }
-    }
-
     private static boolean hasFile(Path dir, String prefix) throws IOException {
         try (Stream<Path> s = Files.list(dir)) {
             return s.anyMatch(f -> f.getFileName().toString().startsWith(prefix));
         }
     }
 
-    private static void deleteOthers(Path dir, String prefix, String keep) throws IOException {
+    static void deleteOthers(Path dir, String prefix, String keep) throws IOException {
         try (Stream<Path> s = Files.list(dir)) {
             for (Path f : (Iterable<Path>) s::iterator) {
                 String n = f.getFileName().toString();
                 if (n.startsWith(prefix) && n.endsWith(".jar") && !n.equals(keep)) Files.deleteIfExists(f);
+            }
+        }
+    }
+
+    /** Deletes jars with this prefix whose name does not mention the Minecraft version. */
+    static void deleteNotContaining(Path dir, String prefix, String mc) throws IOException {
+        try (Stream<Path> s = Files.list(dir)) {
+            for (Path f : (Iterable<Path>) s::iterator) {
+                String n = f.getFileName().toString();
+                if (n.startsWith(prefix) && n.endsWith(".jar") && !n.contains(mc)) Files.deleteIfExists(f);
             }
         }
     }

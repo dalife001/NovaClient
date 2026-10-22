@@ -1,0 +1,4 @@
+# Minecraft versions where Nova has been played in game (one per line).
+# CI builds every version Fabric supports; versions listed here are marked "tested" in latest.json,
+# all others are marked experimental in the launcher and build with lenient mixins.
+1.21.4

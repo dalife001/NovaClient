@@ -1,11 +1,10 @@
 package com.nova.client.gui;
 
+import com.nova.client.compat.Mc;
 import com.nova.client.account.AccountManager;
 import com.nova.client.account.SkinApi;
-import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.text.Text;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -30,21 +29,21 @@ public class SkinScreen extends NovaScreen {
     @Override
     protected void build() {
         int x = px() + 20, lw = 270;
-        TextFieldWidget field = new TextFieldWidget(textRenderer, x, py() + 62, lw, 20, Text.literal("Skin file"));
+        TextFieldWidget field = new TextFieldWidget(textRenderer, x, py() + 62, lw, 20, Mc.text("Skin file"));
         field.setMaxLength(512);
-        field.setPlaceholder(Text.literal("C:\\path\\to\\skin.png"));
+        hint(field, "C:\\path\\to\\skin.png");
         field.setText(pathText);
         field.setChangedListener(s -> pathText = s);
-        addDrawableChild(field);
+        addField(field);
 
         int half = (lw - 5) / 2;
         button(x, py() + 90, half, 22, slim ? "Model: Slim" : "Model: Classic", false, () -> {
             slim = !slim;
             preview = loaded == null ? null : SkinPreview.front(loaded, slim);
-            clearAndInit();
+            rebuild();
         });
         button(x + half + 5, py() + 90, half, 22, "Upload skin", true, this::upload);
-        button(width / 2 - 50, py() + 205, 100, 22, "Back", false, this::close);
+        button(width / 2 - 50, py() + 205, 100, 22, "Back", false, this::nClose);
     }
 
     private void refreshPreview() {
@@ -54,7 +53,7 @@ public class SkinScreen extends NovaScreen {
         loaded = null;
         preview = null;
         try {
-            Path f = Path.of(p);
+            Path f = java.nio.file.Paths.get(p);
             if (p.isEmpty() || !Files.isRegularFile(f)) return;
             BufferedImage img = ImageIO.read(f.toFile());
             if (img == null || img.getWidth() != 64 || (img.getHeight() != 64 && img.getHeight() != 32)) return;
@@ -71,7 +70,7 @@ public class SkinScreen extends NovaScreen {
         boolean s = slim;
         Thread t = new Thread(() -> {
             try {
-                String msg = SkinApi.upload(Path.of(p), s);
+                String msg = SkinApi.upload(java.nio.file.Paths.get(p), s);
                 client.execute(() -> set(msg, Ui.GREEN));
             } catch (Exception e) {
                 client.execute(() -> set(String.valueOf(e.getMessage()), Ui.RED));
@@ -84,7 +83,7 @@ public class SkinScreen extends NovaScreen {
     private void set(String msg, int color) { status = msg; statusColor = color; }
 
     @Override
-    protected void drawBack(DrawContext ctx, int mx, int my, float delta) {
+    protected void drawBack(Gfx ctx, int mx, int my, float delta) {
         Ui.card(ctx, px(), py(), W, 190);
         Ui.headerBand(ctx, px(), py(), W);
         // preview well
@@ -92,7 +91,7 @@ public class SkinScreen extends NovaScreen {
     }
 
     @Override
-    protected void drawFront(DrawContext ctx, int mx, int my, float delta) {
+    protected void drawFront(Gfx ctx, int mx, int my, float delta) {
         refreshPreview();
         int x = px() + 20;
         ctx.drawCenteredTextWithShadow(textRenderer, "Change your skin", width / 2, py() + 9, Ui.TEXT);

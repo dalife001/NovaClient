@@ -1,9 +1,8 @@
 package com.nova.client.gui;
 
 import com.nova.client.config.Config;
+import com.nova.client.util.S;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.NativeImageBackedTexture;
 import net.minecraft.util.Identifier;
@@ -14,10 +13,22 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
-/** Draws the user's custom background image (png or jpg) behind every Nova screen. */
+/**
+ * Draws the user's custom background image (png or jpg) behind every Nova screen.
+ * Needs the 1.20+ drawing API; on older versions the built-in night sky is always used.
+ */
 public final class BackgroundManager {
-    private static final Identifier ID = Identifier.of("novaclient", "custom_background");
+    private static Identifier id() {
+        //#if MC >= 1900
+        return Identifier.of("novaclient", "custom_background");
+        //#else
+        return new Identifier("novaclient", "custom_background");
+        //#endif
+    }
+
+    private static final Identifier ID = id();
     private static String loaded = null;
     private static boolean ok;
     private static int iw, ih;
@@ -25,9 +36,10 @@ public final class BackgroundManager {
     private BackgroundManager() {}
 
     /** @return true if an image was drawn (so the caller skips the gradient). */
-    public static boolean draw(DrawContext ctx, int w, int h, float parX, float parY) {
+    public static boolean draw(Gfx ctx, int w, int h, float parX, float parY) {
+        if (!Gfx.CAN_DRAW_TEXTURE) return false;
         String path = Config.get().background();
-        if (path == null || path.isBlank()) return false;
+        if (S.blank(path)) return false;
         if (!path.equals(loaded)) load(path);
         if (!ok) return false;
 
@@ -36,7 +48,7 @@ public final class BackgroundManager {
         double s = Math.max((double) w / iw, (double) h / ih) * zoom;
         int dw = (int) Math.ceil(iw * s), dh = (int) Math.ceil(ih * s);
         int ox = (w - dw) / 2 - (int) (parX * 18), oy = (h - dh) / 2 - (int) (parY * 12);
-        ctx.drawTexture(RenderLayer::getGuiTextured, ID, ox, oy, 0f, 0f, dw, dh, dw, dh);
+        ctx.drawTexture(ID, ox, oy, dw, dh);
         ctx.fill(0, 0, w, h, 0x95050514); // darken so text stays readable
         return true;
     }
@@ -48,7 +60,7 @@ public final class BackgroundManager {
         loaded = path;
         ok = false;
         try {
-            Path p = Path.of(path.replace("\"", ""));
+            Path p = Paths.get(path.replace("\"", ""));
             if (!Files.isRegularFile(p)) return;
             BufferedImage img = ImageIO.read(p.toFile());
             if (img == null) return;
@@ -57,7 +69,11 @@ public final class BackgroundManager {
             NativeImage ni = NativeImage.read(new ByteArrayInputStream(png.toByteArray()));
             iw = ni.getWidth();
             ih = ni.getHeight();
+            //#if MC >= 2105
+            MinecraftClient.getInstance().getTextureManager().registerTexture(ID, new NativeImageBackedTexture(() -> "novaclient_background", ni));
+            //#else
             MinecraftClient.getInstance().getTextureManager().registerTexture(ID, new NativeImageBackedTexture(ni));
+            //#endif
             ok = true;
         } catch (Exception e) {
             e.printStackTrace();

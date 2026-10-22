@@ -8,7 +8,7 @@ import java.util.stream.Collectors;
 
 /** Builds the java command line and starts Minecraft. */
 final class GameLauncher {
-    static final String VERSION = "1.0.0";
+    static final String VERSION = "1.2.0";
 
     private GameLauncher() {}
 

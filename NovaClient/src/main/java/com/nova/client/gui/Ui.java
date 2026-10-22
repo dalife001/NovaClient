@@ -2,7 +2,6 @@ package com.nova.client.gui;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
 
 /**
  * Shared colours and drawing helpers so every screen feels the same: soft, rounded, calm.
@@ -40,36 +39,36 @@ public final class Ui {
     public static int glass(float alpha) { return ((int) (Anim.clamp01(alpha) * 255f) << 24) | 0xFFFFFF; }
 
     /** Draws text with an alpha; skips it when nearly invisible (Minecraft treats tiny alpha as opaque!). */
-    public static void text(DrawContext c, TextRenderer tr, String s, int x, int y, int color, float alpha) {
+    public static void text(Gfx c, TextRenderer tr, String s, int x, int y, int color, float alpha) {
         int col = a(color, alpha);
         if ((col >>> 24) < 12) return;
         c.drawTextWithShadow(tr, s, x, y, col);
     }
 
-    public static void centered(DrawContext c, TextRenderer tr, String s, int cx, int y, int color, float alpha) {
+    public static void centered(Gfx c, TextRenderer tr, String s, int cx, int y, int color, float alpha) {
         text(c, tr, s, cx - tr.getWidth(s) / 2, y, color, alpha);
     }
 
     /** Text drawn at a larger size around centre x. */
-    public static void big(DrawContext c, TextRenderer tr, String s, int cx, int y, float scale, int color, float alpha) {
-        c.getMatrices().push();
-        c.getMatrices().translate(cx - tr.getWidth(s) * scale / 2f, y, 0);
-        c.getMatrices().scale(scale, scale, 1f);
+    public static void big(Gfx c, TextRenderer tr, String s, int cx, int y, float scale, int color, float alpha) {
+        c.push();
+        c.translate((float) (cx - tr.getWidth(s) * scale / 2f), (float) (y));
+        c.scale(scale, scale);
         text(c, tr, s, 0, 0, color, alpha);
-        c.getMatrices().pop();
+        c.pop();
     }
 
     /** Left-aligned text at a larger size. */
-    public static void scaled(DrawContext c, TextRenderer tr, String s, float x, float y, float scale, int color, float alpha) {
-        c.getMatrices().push();
-        c.getMatrices().translate(x, y, 0);
-        c.getMatrices().scale(scale, scale, 1f);
+    public static void scaled(Gfx c, TextRenderer tr, String s, float x, float y, float scale, int color, float alpha) {
+        c.push();
+        c.translate((float) (x), (float) (y));
+        c.scale(scale, scale);
         text(c, tr, s, 0, 0, color, alpha);
-        c.getMatrices().pop();
+        c.pop();
     }
 
     /** Letters that slowly drift between the two palette colours, centred on cx. */
-    public static void shimmer(DrawContext c, TextRenderer tr, String s, int cx, int y, float scale, float alpha) {
+    public static void shimmer(Gfx c, TextRenderer tr, String s, int cx, int y, float scale, float alpha) {
         int total = 0;
         for (int i = 0; i < s.length(); i++) total += tr.getWidth(String.valueOf(s.charAt(i)));
         flow(c, tr, s, cx - total * scale / 2f, y, scale, 0, alpha, false);
@@ -79,7 +78,7 @@ public final class Ui {
      * Left-aligned, letter-spaced text whose colour flows slowly through the palette.
      * With `bob` each letter also floats up and down very gently.
      */
-    public static void flow(DrawContext c, TextRenderer tr, String s, float x, float y, float scale, float spacing, float alpha, boolean bob) {
+    public static void flow(Gfx c, TextRenderer tr, String s, float x, float y, float scale, float spacing, float alpha, boolean bob) {
         float t = Anim.seconds();
         float cx = x;
         for (int i = 0; i < s.length(); i++) {
@@ -117,7 +116,7 @@ public final class Ui {
     private static int clampR(int r, int w, int h) { return Math.max(0, Math.min(Math.min(r, MAX_R), Math.min(w, h) / 2)); }
 
     /** Filled rectangle with truly round corners (radius r, softened edge). */
-    public static void rrect(DrawContext c, int x, int y, int w, int h, int r, int color) {
+    public static void rrect(Gfx c, int x, int y, int w, int h, int r, int color) {
         if (w <= 0 || h <= 0 || (color >>> 24) == 0) return;
         r = clampR(r, w, h);
         if (r <= 1) { c.fill(x, y, x + w, y + h, color); return; }
@@ -138,7 +137,7 @@ public final class Ui {
     }
 
     /** A one pixel rounded outline. */
-    public static void rim(DrawContext c, int x, int y, int w, int h, int r, int color) {
+    public static void rim(Gfx c, int x, int y, int w, int h, int r, int color) {
         if (w <= 0 || h <= 0 || (color >>> 24) == 0) return;
         r = clampR(r, w, h);
         if (r <= 1) { outline(c, x, y, w, h, color); return; }
@@ -157,18 +156,18 @@ public final class Ui {
     }
 
     /** Old name kept: now draws a properly rounded rectangle. */
-    public static void round(DrawContext c, int x, int y, int w, int h, int color) {
+    public static void round(Gfx c, int x, int y, int w, int h, int color) {
         rrect(c, x, y, w, h, Math.min(4, Math.min(w, h) / 2), color);
     }
 
     /** Soft drop shadow under a rounded shape. */
-    public static void shadow(DrawContext c, int x, int y, int w, int h, int r, float alpha) {
+    public static void shadow(Gfx c, int x, int y, int w, int h, int r, float alpha) {
         rrect(c, x - 3, y, w + 6, h + 5, r + 3, a(0xFF000000, 0.07f * alpha));
         rrect(c, x - 1, y + 1, w + 2, h + 3, r + 1, a(0xFF000000, 0.10f * alpha));
     }
 
     /** The standard frosted surface: shadow, tinted body, light top edge, thin rim. */
-    public static void panel(DrawContext c, int x, int y, int w, int h, int r, int fill, float alpha) {
+    public static void panel(Gfx c, int x, int y, int w, int h, int r, int fill, float alpha) {
         shadow(c, x, y, w, h, r, alpha);
         rrect(c, x, y, w, h, r, a(fill, alpha));
         int hh = Math.min(h / 3, 18);
@@ -176,16 +175,16 @@ public final class Ui {
         rim(c, x, y, w, h, r, glass(0.13f * alpha));
     }
 
-    public static void card(DrawContext c, int x, int y, int w, int h) { panel(c, x, y, w, h, 7, PANEL, 1f); }
+    public static void card(Gfx c, int x, int y, int w, int h) { panel(c, x, y, w, h, 7, PANEL, 1f); }
 
     /** Soft tinted band at the top of a card, with a hairline under it (replaces the old hard coloured bar). */
-    public static void headerBand(DrawContext c, int x, int y, int w) {
+    public static void headerBand(Gfx c, int x, int y, int w) {
         c.fillGradient(x + 6, y + 1, x + w - 6, y + 26, a(ACCENT, 0.22f), a(ACCENT, 0f));
         c.fill(x + 10, y + 26, x + w - 10, y + 27, glass(0.10f));
     }
 
     /** Left-to-right gradient. */
-    public static void hGradient(DrawContext c, int x, int y, int w, int h, int c1, int c2) {
+    public static void hGradient(Gfx c, int x, int y, int w, int h, int c1, int c2) {
         if (w <= 0) return;
         int step = 2;
         for (int i = 0; i < w; i += step) {
@@ -194,7 +193,7 @@ public final class Ui {
     }
 
     /** A rounded progress or slider fill: rounded track, rounded fill in the accent colours. */
-    public static void bar(DrawContext c, int x, int y, int w, int h, float fraction, float alpha) {
+    public static void bar(Gfx c, int x, int y, int w, int h, float fraction, float alpha) {
         rrect(c, x, y, w, h, h / 2, glass(0.10f * alpha));
         int fw = (int) (w * Anim.clamp01(fraction));
         if (fw >= h) {
@@ -203,7 +202,7 @@ public final class Ui {
         }
     }
 
-    public static void outline(DrawContext c, int x, int y, int w, int h, int color) {
+    public static void outline(Gfx c, int x, int y, int w, int h, int color) {
         c.fill(x, y, x + w, y + 1, color);
         c.fill(x, y + h - 1, x + w, y + h, color);
         c.fill(x, y, x + 1, y + h, color);
@@ -215,7 +214,7 @@ public final class Ui {
     }
 
     /** A four-point twinkle. */
-    public static void sparkle(DrawContext c, int cx, int cy, int size, int color) {
+    public static void sparkle(Gfx c, int cx, int cy, int size, int color) {
         if ((color >>> 24) < 4 || size < 1) return;
         c.fill(cx - size, cy, cx + size + 1, cy + 1, a(color, 0.55f));
         c.fill(cx, cy - size, cx + 1, cy + size + 1, a(color, 0.55f));
@@ -224,7 +223,7 @@ public final class Ui {
     }
 
     /** Soft round glow made of stacked translucent ellipses. */
-    public static void glow(DrawContext c, int cx, int cy, int rx, int ry, int rgb, float intensity) {
+    public static void glow(Gfx c, int cx, int cy, int rx, int ry, int rgb, float intensity) {
         if (rx < 2 || ry < 2 || intensity <= 0f) return;
         int layers = 9;
         int per = Math.max(1, (int) (Anim.clamp01(intensity) * 255f / layers));
@@ -257,7 +256,7 @@ public final class Ui {
     }
 
     /** The living night sky (or your own wallpaper with soft stars on top). */
-    public static void background(DrawContext c, int w, int h) {
+    public static void background(Gfx c, int w, int h) {
         float dx = parallaxX(), dy = parallaxY();
         if (BackgroundManager.draw(c, w, h, dx, dy)) {
             Cosmos.stars(c, w, h, dx, dy, 0.55f);

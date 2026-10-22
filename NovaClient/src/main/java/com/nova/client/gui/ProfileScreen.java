@@ -1,12 +1,11 @@
 package com.nova.client.gui;
 
+import com.nova.client.compat.Mc;
 import com.nova.client.NovaClient;
 import com.nova.client.PlayStats;
 import com.nova.client.config.Config;
 import com.nova.client.friends.FriendsManager;
-import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.session.Session;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -27,14 +26,14 @@ public class ProfileScreen extends NovaScreen {
         int rx = px + 172, rw = pw - 172 - 16;
         int bw = (rw - 12) / 3;
         int by = py + ph - 34;
-        button(rx, by, bw, 20, "Skins", true, () -> client.setScreen(new SkinScreen(this)));
-        button(rx + bw + 6, by, bw, 20, "Account", false, () -> client.setScreen(new AccountScreen(this)));
-        button(rx + 2 * (bw + 6), by, bw, 20, "Friends", false, () -> client.setScreen(new FriendsScreen(this)));
-        button(px + 12, py + ph - 26, 60, 16, "< Back", AnimButton.Style.GHOST, this::close);
+        button(rx, by, bw, 20, "Skins", true, () -> Mc.setScreen(client, new SkinScreen(this)));
+        button(rx + bw + 6, by, bw, 20, "Account", false, () -> Mc.setScreen(client, new AccountScreen(this)));
+        button(rx + 2 * (bw + 6), by, bw, 20, "Friends", false, () -> Mc.setScreen(client, new FriendsScreen(this)));
+        button(px + 12, py + ph - 26, 60, 16, "< Back", AnimButton.Style.GHOST, this::nClose);
     }
 
     @Override
-    protected void drawBack(DrawContext ctx, int mx, int my, float delta) {
+    protected void drawBack(Gfx ctx, int mx, int my, float delta) {
         float e = Anim.stagger(age(), 0f, 0.4f);
         int dy = (int) ((1f - e) * 12);
         Ui.panel(ctx, px, py + dy, pw, ph, 9, 0xEC0E0C24, e);
@@ -44,11 +43,11 @@ public class ProfileScreen extends NovaScreen {
     }
 
     @Override
-    protected void drawFront(DrawContext ctx, int mx, int my, float delta) {
+    protected void drawFront(Gfx ctx, int mx, int my, float delta) {
         SkinCache.ensure();
         float t = age();
         String name = client.getSession().getUsername();
-        boolean online = client.getSession().getAccountType() == Session.AccountType.MSA;
+        boolean online = Mc.online(client);
 
         // ---- left: figure on a glowing platform ----
         float eF = Anim.stagger(t, 0.1f, 0.6f);

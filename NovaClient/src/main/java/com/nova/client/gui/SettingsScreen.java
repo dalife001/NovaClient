@@ -1,12 +1,11 @@
 package com.nova.client.gui;
 
+import com.nova.client.compat.Mc;
 import com.nova.client.NovaClient;
 import com.nova.client.UpdateChecker;
 import com.nova.client.config.Config;
-import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.text.Text;
 
 public class SettingsScreen extends NovaScreen {
     private static final int W = 380;
@@ -23,12 +22,12 @@ public class SettingsScreen extends NovaScreen {
     protected void build() {
         int x = px() + 20, w = W - 40;
 
-        TextFieldWidget bg = new TextFieldWidget(textRenderer, x, py() + 52, w, 20, Text.literal("Background"));
+        TextFieldWidget bg = new TextFieldWidget(textRenderer, x, py() + 52, w, 20, Mc.text("Background"));
         bg.setMaxLength(512);
-        bg.setPlaceholder(Text.literal("C:\\path\\to\\wallpaper.png (png or jpg)"));
+        hint(bg, "C:\\path\\to\\wallpaper.png (png or jpg)");
         bg.setText(bgText);
         bg.setChangedListener(s -> bgText = s);
-        addDrawableChild(bg);
+        addField(bg);
 
         int half = (w - 5) / 2;
         button(x, py() + 76, half, 20, "Apply background", true, () -> {
@@ -42,16 +41,16 @@ public class SettingsScreen extends NovaScreen {
             Config.get().backgroundPath = "";
             Config.save();
             BackgroundManager.reset();
-            clearAndInit();
+            rebuild();
             status = "Background removed";
         });
 
-        TextFieldWidget url = new TextFieldWidget(textRenderer, x, py() + 126, w, 20, Text.literal("Update URL"));
+        TextFieldWidget url = new TextFieldWidget(textRenderer, x, py() + 126, w, 20, Mc.text("Update URL"));
         url.setMaxLength(512);
-        url.setPlaceholder(Text.literal("https://.../latest.json (the launcher sets this for you)"));
+        hint(url, "https://.../latest.json (the launcher sets this for you)");
         url.setText(urlText);
         url.setChangedListener(s -> urlText = s);
-        addDrawableChild(url);
+        addField(url);
 
         button(x, py() + 150, half, 20, "Save + check updates", true, () -> {
             Config.get().updateManifestUrl = urlText.trim();
@@ -63,17 +62,17 @@ public class SettingsScreen extends NovaScreen {
                 net.minecraft.util.Util.getOperatingSystem().open(
                         net.fabricmc.loader.api.FabricLoader.getInstance().getGameDir().resolve("mods").toFile()));
 
-        button(width / 2 - 50, py() + 196, 100, 22, "Back", false, this::close);
+        button(width / 2 - 50, py() + 196, 100, 22, "Back", false, this::nClose);
     }
 
     @Override
-    protected void drawBack(DrawContext ctx, int mx, int my, float delta) {
+    protected void drawBack(Gfx ctx, int mx, int my, float delta) {
         Ui.card(ctx, px(), py(), W, 182);
         Ui.headerBand(ctx, px(), py(), W);
     }
 
     @Override
-    protected void drawFront(DrawContext ctx, int mx, int my, float delta) {
+    protected void drawFront(Gfx ctx, int mx, int my, float delta) {
         int cx = width / 2;
         ctx.drawCenteredTextWithShadow(textRenderer, "Settings", cx, py() + 9, Ui.TEXT);
         ctx.drawTextWithShadow(textRenderer, "Custom background image", px() + 20, py() + 38, Ui.MUTED);

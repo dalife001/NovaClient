@@ -1,8 +1,9 @@
 package com.nova.client.module;
 
+import com.nova.client.compat.Mc;
+import com.nova.client.gui.Gfx;
 import com.nova.client.gui.Ui;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
 
 /** A fully custom crosshair. Replaces the vanilla one while enabled. */
 public class CrosshairModule extends Module {
@@ -20,19 +21,19 @@ public class CrosshairModule extends Module {
     @Override public String category() { return "Visual"; }
 
     private int argb() {
-        return switch ((int) color.get()) {
-            case 0 -> 0xFFFFFFFF;
-            case 1 -> Ui.ACCENT;
-            case 2 -> Ui.CYAN;
-            case 3 -> 0xFF34D399;
-            case 4 -> 0xFFF87171;
-            default -> 0xFFFBBF24;
-        };
+        switch ((int) color.get()) {
+            case 0: return 0xFFFFFFFF;
+            case 1: return Ui.ACCENT;
+            case 2: return Ui.CYAN;
+            case 3: return 0xFF34D399;
+            case 4: return 0xFFF87171;
+            default: return 0xFFFBBF24;
+        }
     }
 
     @Override
-    public void onRender(DrawContext ctx, MinecraftClient mc) {
-        if (mc.options.hudHidden || !mc.options.getPerspective().isFirstPerson()) return;
+    public void onRender(Gfx ctx, MinecraftClient mc) {
+        if (mc.options.hudHidden || !Mc.firstPerson(mc)) return;
         int cx = mc.getWindow().getScaledWidth() / 2, cy = mc.getWindow().getScaledHeight() / 2;
         int s = (int) size.get(), g = (int) gap.get(), t = (int) thickness.get();
         int c = argb(), o = 0xB0000000;
@@ -46,7 +47,7 @@ public class CrosshairModule extends Module {
         }
     }
 
-    private static void arms(DrawContext ctx, int cx, int cy, int s, int g, int lo, int hi, int grow, int color) {
+    private static void arms(Gfx ctx, int cx, int cy, int s, int g, int lo, int hi, int grow, int color) {
         ctx.fill(cx - g - s - grow, cy - lo - grow, cx - g + grow, cy + hi + grow, color);   // left
         ctx.fill(cx + g - grow, cy - lo - grow, cx + g + s + grow, cy + hi + grow, color);   // right
         ctx.fill(cx - lo - grow, cy - g - s - grow, cx + hi + grow, cy - g + grow, color);   // top

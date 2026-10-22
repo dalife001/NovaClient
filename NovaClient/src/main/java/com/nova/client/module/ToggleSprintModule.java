@@ -1,5 +1,6 @@
 package com.nova.client.module;
 
+import com.nova.client.compat.Mc;
 import net.minecraft.client.MinecraftClient;
 
 public class ToggleSprintModule extends Module {
@@ -8,7 +9,7 @@ public class ToggleSprintModule extends Module {
     @Override
     public void onTick(MinecraftClient mc) {
         if (mc.player == null) return;
-        if (mc.options.forwardKey.isPressed()
+        if (Mc.forward(mc.options).isPressed()
                 && !mc.player.isSneaking()
                 && !mc.player.horizontalCollision
                 && mc.player.getHungerManager().getFoodLevel() > 6) {

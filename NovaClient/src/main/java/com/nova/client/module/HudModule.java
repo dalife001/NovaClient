@@ -1,7 +1,7 @@
 package com.nova.client.module;
 
+import com.nova.client.gui.Gfx;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
 
 /**
  * A module that draws something on screen. Position and scale are editable in the HUD editor.
@@ -25,7 +25,7 @@ public abstract class HudModule extends Module {
 
     protected abstract int contentW(MinecraftClient mc);
     protected abstract int contentH(MinecraftClient mc);
-    protected abstract void draw(DrawContext ctx, MinecraftClient mc);
+    protected abstract void draw(Gfx ctx, MinecraftClient mc);
 
     /** Screen rectangle {x, y, w, h} in scaled GUI pixels. */
     public int[] bounds(MinecraftClient mc) {
@@ -39,17 +39,17 @@ public abstract class HudModule extends Module {
         return new int[]{x, y, w, h};
     }
 
-    public void renderAt(DrawContext ctx, MinecraftClient mc, int x, int y) {
+    public void renderAt(Gfx ctx, MinecraftClient mc, int x, int y) {
         float s = (float) scale.get();
-        ctx.getMatrices().push();
-        ctx.getMatrices().translate(x, y, 0);
-        ctx.getMatrices().scale(s, s, 1f);
+        ctx.push();
+        ctx.translate((float) (x), (float) (y));
+        ctx.scale(s, s);
         draw(ctx, mc);
-        ctx.getMatrices().pop();
+        ctx.pop();
     }
 
     @Override
-    public void onRender(DrawContext ctx, MinecraftClient mc) {
+    public void onRender(Gfx ctx, MinecraftClient mc) {
         int[] b = bounds(mc);
         renderAt(ctx, mc, b[0], b[1]);
     }

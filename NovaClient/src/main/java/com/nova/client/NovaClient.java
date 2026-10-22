@@ -1,9 +1,11 @@
 package com.nova.client;
 
+import com.nova.client.compat.Mc;
 import com.nova.client.account.AccountManager;
 import com.nova.client.config.Config;
 import com.nova.client.gui.ClickGuiScreen;
 import com.nova.client.gui.HudEditorScreen;
+import com.nova.client.gui.Gfx;
 import com.nova.client.gui.Toasts;
 import com.nova.client.gui.Ui;
 import com.nova.client.gui.NovaTitleScreen;
@@ -17,7 +19,6 @@ import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.TitleScreen;
 import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.util.InputUtil;
 import org.lwjgl.glfw.GLFW;
 
 public class NovaClient implements ClientModInitializer {
@@ -27,7 +28,6 @@ public class NovaClient implements ClientModInitializer {
     public static ModuleManager modules;
 
     private static KeyBinding openGuiKey;
-    private static KeyBinding freecamKey;
     public static KeyBinding zoomKey;
 
     @Override
@@ -38,52 +38,46 @@ public class NovaClient implements ClientModInitializer {
         PlayStats.onStart();
         modules = new ModuleManager();
 
-        openGuiKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                "key.novaclient.open_gui", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_SHIFT, "category.novaclient"));
-        freecamKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                "key.novaclient.freecam", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_F6, "category.novaclient"));
-
-        zoomKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                "key.novaclient.zoom", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_C, "category.novaclient"));
+        openGuiKey = KeyBindingHelper.registerKeyBinding(Mc.newKey("key.novaclient.open_gui", GLFW.GLFW_KEY_RIGHT_SHIFT));
+        zoomKey = KeyBindingHelper.registerKeyBinding(Mc.newKey("key.novaclient.zoom", GLFW.GLFW_KEY_C));
 
         // put the player's normal brightness back when the game closes
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> modules.fullbright.release());
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (client.currentScreen instanceof TitleScreen) {
-                client.setScreen(new NovaTitleScreen());
+                Mc.setScreen(client, new NovaTitleScreen());
             }
             while (openGuiKey.wasPressed()) {
-                if (client.currentScreen == null) client.setScreen(new ClickGuiScreen(null));
-            }
-            while (freecamKey.wasPressed()) {
-                if (client.currentScreen == null && client.player != null) {
-                    modules.freecam.toggle();
-                    Toasts.push("Freecam", modules.freecam.isEnabled() ? "On - WASD to fly" : "Off",
-                            modules.freecam.isEnabled() ? Ui.CYAN : Ui.MUTED);
-                }
+                if (client.currentScreen == null) Mc.setScreen(client, new ClickGuiScreen(null));
             }
             PlayStats.tick(client);
             if (!updateToasted && UpdateChecker.available()) {
                 updateToasted = true;
                 Toasts.push("Update available", "Nova Client " + UpdateChecker.latest, Ui.CYAN);
             }
-            // leaving the world turns freecam off
-            if (client.player == null && modules.freecam.isEnabled()) modules.freecam.setEnabled(false);
             modules.onTick(client);
         });
 
-        HudRenderCallback.EVENT.register((context, tickCounter) -> {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.player != null && !mc.options.hudHidden && !(mc.currentScreen instanceof HudEditorScreen)) {
-                modules.onRender(context, mc);
-            }
-            if (mc.currentScreen == null) {
-                Toasts.render(context, mc.textRenderer, mc.getWindow().getScaledWidth(), mc.getWindow().getScaledHeight());
-            }
-        });
+        //#if MC >= 2100
+        HudRenderCallback.EVENT.register((context, tickCounter) -> renderHud(new Gfx(context)));
+        //#elseif MC >= 2000
+        HudRenderCallback.EVENT.register((context, tickDelta) -> renderHud(new Gfx(context)));
+        //#else
+        HudRenderCallback.EVENT.register((matrices, tickDelta) -> renderHud(new Gfx(matrices)));
+        //#endif
 
         AccountManager.tryAutoLogin();
         UpdateChecker.checkOnce();
+    }
+
+    private static void renderHud(Gfx context) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.player != null && !mc.options.hudHidden && !(mc.currentScreen instanceof HudEditorScreen)) {
+            modules.onRender(context, mc);
+        }
+        if (mc.currentScreen == null) {
+            Toasts.render(context, mc.textRenderer, mc.getWindow().getScaledWidth(), mc.getWindow().getScaledHeight());
+        }
     }
 }

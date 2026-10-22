@@ -1,16 +1,17 @@
 package com.nova.client.account;
 
 import com.google.gson.JsonObject;
+import com.nova.client.util.Net;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.net.URI;
-import java.net.http.HttpRequest;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 /** Uploads a skin to your Minecraft profile via the official Minecraft Services API. */
@@ -21,7 +22,6 @@ public final class SkinApi {
         String token = AccountManager.mcToken;
         if (token == null) throw new IllegalStateException("Log in with Microsoft first");
         if (!Files.isRegularFile(file)) throw new IllegalArgumentException("File not found: " + file);
-
         byte[] data = Files.readAllBytes(file);
         BufferedImage img = ImageIO.read(new ByteArrayInputStream(data));
         if (img == null) throw new IllegalArgumentException("That is not a valid PNG image");
@@ -38,11 +38,11 @@ public final class SkinApi {
         out.write(data);
         write(out, "\r\n--" + boundary + "--\r\n");
 
-        HttpRequest req = HttpRequest.newBuilder(URI.create("https://api.minecraftservices.com/minecraft/profile/skins"))
-                .header("Authorization", "Bearer " + token)
-                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
-                .POST(HttpRequest.BodyPublishers.ofByteArray(out.toByteArray())).build();
-        JsonObject res = MicrosoftAuth.send(req);
+        Map<String, String> h = new HashMap<String, String>();
+        h.put("Authorization", "Bearer " + token);
+        h.put("Content-Type", "multipart/form-data; boundary=" + boundary);
+        JsonObject res = MicrosoftAuth.send(Net.request("POST", "https://api.minecraftservices.com/minecraft/profile/skins",
+                h, out.toByteArray(), 30000));
         int status = res.get("_status").getAsInt();
         if (status == 200) return "Skin updated! Rejoin a world/server to see it.";
         String msg = res.has("errorMessage") ? res.get("errorMessage").getAsString() : "HTTP " + status;

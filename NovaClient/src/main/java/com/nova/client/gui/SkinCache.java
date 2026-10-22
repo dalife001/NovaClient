@@ -1,19 +1,14 @@
 package com.nova.client.gui;
 
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.nova.client.compat.Mc;
+import com.nova.client.util.Net;
+import com.nova.client.util.S;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.session.Session;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.Base64;
 
 /** Downloads the logged-in player's skin once and draws their head / body from it. */
@@ -30,7 +25,7 @@ public final class SkinCache {
         MinecraftClient mc = MinecraftClient.getInstance();
         String name = mc.getSession().getUsername();
         if (name.equals(forName) || loading || System.currentTimeMillis() < retryAt) return;
-        if (mc.getSession().getAccountType() != Session.AccountType.MSA) { // offline names have no real skin
+        if (!Mc.online(mc)) { // offline names have no real skin
             forName = name;
             pixels = null;
             return;
@@ -38,20 +33,14 @@ public final class SkinCache {
         loading = true;
         Thread t = new Thread(() -> {
             try {
-                HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10))
-                        .followRedirects(HttpClient.Redirect.NORMAL).build();
-                JsonObject id = JsonParser.parseString(get(http, "https://api.mojang.com/users/profiles/minecraft/" + name))
-                        .getAsJsonObject();
-                JsonObject prof = JsonParser.parseString(get(http,
-                        "https://sessionserver.mojang.com/session/minecraft/profile/" + id.get("id").getAsString()))
-                        .getAsJsonObject();
+                JsonObject id = S.parseObject(get("https://api.mojang.com/users/profiles/minecraft/" + name));
+                JsonObject prof = S.parseObject(get("https://sessionserver.mojang.com/session/minecraft/profile/" + id.get("id").getAsString()));
                 String b64 = prof.getAsJsonArray("properties").get(0).getAsJsonObject().get("value").getAsString();
-                JsonObject skin = JsonParser.parseString(new String(Base64.getDecoder().decode(b64)))
-                        .getAsJsonObject().getAsJsonObject("textures").getAsJsonObject("SKIN");
+                JsonObject skin = S.parseObject(new String(Base64.getDecoder().decode(b64), java.nio.charset.StandardCharsets.UTF_8))
+                        .getAsJsonObject("textures").getAsJsonObject("SKIN");
                 boolean slim = skin.has("metadata") && skin.getAsJsonObject("metadata").has("model");
-                HttpResponse<byte[]> r = http.send(HttpRequest.newBuilder(URI.create(skin.get("url").getAsString())).build(),
-                        HttpResponse.BodyHandlers.ofByteArray());
-                BufferedImage img = ImageIO.read(new ByteArrayInputStream(r.body()));
+                Net.Response r = Net.get(skin.get("url").getAsString());
+                BufferedImage img = ImageIO.read(new ByteArrayInputStream(r.bytes));
                 pixels = SkinPreview.front(img, slim);
                 forName = name;
             } catch (Exception e) {
@@ -64,17 +53,16 @@ public final class SkinCache {
         t.start();
     }
 
-    private static String get(HttpClient http, String url) throws Exception {
-        HttpResponse<String> r = http.send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(10)).build(),
-                HttpResponse.BodyHandlers.ofString());
-        if (r.statusCode() != 200) throw new IllegalStateException("HTTP " + r.statusCode());
+    private static String get(String url) throws Exception {
+        Net.Response r = Net.get(url);
+        if (r.status != 200) throw new IllegalStateException("HTTP " + r.status);
         return r.body();
     }
 
     public static boolean hasSkin() { return pixels != null; }
 
     /** The face (with hat layer) as a size x size square, or a coloured initial if there is no skin. */
-    public static void drawHead(DrawContext c, int x, int y, int size, float alpha) {
+    public static void drawHead(Gfx c, int x, int y, int size, float alpha) {
         int[] p = pixels;
         if (p == null) {
             Ui.round(c, x, y, size, size, Ui.a(Ui.ACCENT_DARK, alpha));
@@ -95,7 +83,7 @@ public final class SkinCache {
     }
 
     /** Full body, front view. Returns false if there is no skin to draw. */
-    public static boolean drawBody(DrawContext c, int x, int y, int scale, float alpha) {
+    public static boolean drawBody(Gfx c, int x, int y, int scale, float alpha) {
         int[] p = pixels;
         if (p == null) return false;
         for (int py = 0; py < SkinPreview.H; py++) {

@@ -1,7 +1,7 @@
 package com.nova.client.module;
 
+import com.nova.client.gui.Gfx;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,7 +37,7 @@ public abstract class Module {
     protected void onEnable() {}
     protected void onDisable() {}
     public void onTick(MinecraftClient mc) {}
-    public void onRender(DrawContext ctx, MinecraftClient mc) {}
+    public void onRender(Gfx ctx, MinecraftClient mc) {}
 
     /** Used only to load the saved state without firing hooks. */
     void restore(boolean value) { this.enabled = value; }

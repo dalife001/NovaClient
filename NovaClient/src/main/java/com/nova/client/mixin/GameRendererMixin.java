@@ -10,11 +10,20 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(GameRenderer.class)
 public abstract class GameRendererMixin {
-    /** Narrows the field of view while the zoom key is held. */
+    /** Narrows the field of view while the zoom key is held (getFov returns a double until 1.21.1, a float after). */
+    //#if MC >= 2102
+    @Inject(method = "getFov", at = @At("RETURN"), cancellable = true)
+    private void nova$zoom(Camera camera, float tickDelta, boolean changingFov, CallbackInfoReturnable<Float> cir) {
+        if (NovaClient.modules != null && NovaClient.modules.zoom.isZooming()) {
+            cir.setReturnValue(cir.getReturnValue() * (float) NovaClient.modules.zoom.factor());
+        }
+    }
+    //#else
     @Inject(method = "getFov", at = @At("RETURN"), cancellable = true)
     private void nova$zoom(Camera camera, float tickDelta, boolean changingFov, CallbackInfoReturnable<Double> cir) {
         if (NovaClient.modules != null && NovaClient.modules.zoom.isZooming()) {
             cir.setReturnValue(cir.getReturnValue() * NovaClient.modules.zoom.factor());
         }
     }
+    //#endif
 }
