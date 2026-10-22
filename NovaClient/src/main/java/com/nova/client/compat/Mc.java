@@ -48,7 +48,7 @@ public final class Mc {
     }
 
     public static void setScreen(MinecraftClient c, Screen s) {
-        //#if MC >= 1800
+        //#if MC >= 1701
         c.setScreen(s);
         //#else
         c.openScreen(s);
