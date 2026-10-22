@@ -64,7 +64,7 @@ jobs:
           java-version: ${{ matrix.jdk }}
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: 8.14.3
+          gradle-version: ${{ matrix.gradle }}
       - name: Build Nova for Minecraft ${{ matrix.mc }}
         id: build
         continue-on-error: true

@@ -48,11 +48,18 @@ def pick_fabric_api(versions):
 def loom_for(mc):
     """Newer Minecraft needs a newer Fabric Loom (the Gradle plugin). Older ones keep the version that is known to work."""
     v = vkey(mc)
+    if v >= vkey("1.21.11"):
+        return "1.14-SNAPSHOT"  # 1.11 chokes on the javadoc Fabric API ships for 1.21.11
     if v >= vkey("1.21.9"):
         return "1.11-SNAPSHOT"
     if v >= vkey("1.21.5"):
         return "1.10-SNAPSHOT"
     return "1.9-SNAPSHOT"
+
+
+def gradle_for(mc):
+    """Loom 1.14 needs Gradle 9; everything else stays on the Gradle that is known to work."""
+    return "9.2.1" if vkey(mc) >= vkey("1.21.11") else "8.14.3"
 
 
 def java_for(mojang_version_json):
@@ -85,7 +92,7 @@ def main():
             skipped.append(f"{mc}: no {'yarn mapping' if not yarn else 'Fabric API build'}")
             continue
         include.append({"mc": mc, "yarn": yarn, "fabric_api": api, "java": java, "jdk": max(21, java),
-                        "tested": mc in tested, "loom": loom_for(mc)})
+                        "tested": mc in tested, "loom": loom_for(mc), "gradle": gradle_for(mc)})
 
     print(f"Building {len(include)} versions, skipping {len(skipped)}")
     for s in skipped:

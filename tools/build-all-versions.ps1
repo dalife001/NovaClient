@@ -12,24 +12,26 @@ $ProgressPreference = 'SilentlyContinue'
 $root   = Split-Path -Parent $PSScriptRoot
 $proj   = Join-Path $root 'NovaClient'
 $out    = Join-Path $root 'dist\mods'
-$gradleVer = '8.14.3'
-$gradleHome = Join-Path $proj ".gradle-dist\gradle-$gradleVer"
 $ua = @{ 'User-Agent' = 'NovaClient-local/1.0' }
 
 function Vkey($v) { ($v -split '\.' | ForEach-Object { '{0:D4}' -f [int]$_ }) -join '.' }
 function Get-Json($url) { for ($i=0; $i -lt 4; $i++) { try { return Invoke-RestMethod -Uri $url -Headers $ua -TimeoutSec 30 } catch { if ($i -eq 3) { throw }; Start-Sleep -Seconds (2*($i+1)) } } }
-function LoomFor($mc) { $k = Vkey $mc; if ($k -ge (Vkey '1.21.9')) { '1.11-SNAPSHOT' } elseif ($k -ge (Vkey '1.21.5')) { '1.10-SNAPSHOT' } else { '1.9-SNAPSHOT' } }
+function LoomFor($mc) { $k = Vkey $mc; if ($k -ge (Vkey '1.21.11')) { '1.14-SNAPSHOT' } elseif ($k -ge (Vkey '1.21.9')) { '1.11-SNAPSHOT' } elseif ($k -ge (Vkey '1.21.5')) { '1.10-SNAPSHOT' } else { '1.9-SNAPSHOT' } }
 
 if (-not (Get-Command javac -ErrorAction SilentlyContinue)) { Write-Host 'Install a JDK 21 first: winget install EclipseAdoptium.Temurin.21.JDK  (then reopen this window)'; exit 1 }
 
-# Gradle 8.14.3 (newer Loom needs it), downloaded once next to the project
-if (-not (Test-Path (Join-Path $gradleHome 'bin\gradle.bat'))) {
-  Write-Host "Downloading Gradle $gradleVer (one time)..."
-  $zip = Join-Path $proj 'gradle-dl.zip'
-  Invoke-WebRequest "https://services.gradle.org/distributions/gradle-$gradleVer-bin.zip" -OutFile $zip
-  Expand-Archive -Force $zip (Join-Path $proj '.gradle-dist'); Remove-Item $zip
+# Gradle is downloaded once per needed version, next to the project (1.21.11 needs Gradle 9 for Loom 1.14)
+function Get-Gradle($ver) {
+  $home_ = Join-Path $proj ".gradle-dist\gradle-$ver"
+  if (-not (Test-Path (Join-Path $home_ 'bin\gradle.bat'))) {
+    Write-Host "Downloading Gradle $ver (one time)..."
+    $zip = Join-Path $proj 'gradle-dl.zip'
+    Invoke-WebRequest "https://services.gradle.org/distributions/gradle-$ver-bin.zip" -OutFile $zip
+    Expand-Archive -Force $zip (Join-Path $proj '.gradle-dist'); Remove-Item $zip
+  }
+  return (Join-Path $home_ 'bin\gradle.bat')
 }
-$gradle = Join-Path $gradleHome 'bin\gradle.bat'
+function GradleFor($mc) { if ((Vkey $mc) -ge (Vkey '1.21.11')) { '9.2.1' } else { '8.14.3' } }
 
 # ---- which versions? ----
 Write-Host 'Asking Fabric which Minecraft versions exist...'
@@ -58,6 +60,7 @@ foreach ($mc in $versions) {
 
   Push-Location (Join-Path $proj 'NovaClient')
   $log = Join-Path $out "build-$mc.log"
+  $gradle = Get-Gradle (GradleFor $mc)
   & $gradle build --no-daemon "-Pminecraft_version=$mc" "-Pyarn_mappings=$yarn" "-Pfabric_version=$api" "-Pjava_version=$java" "-Ploom_version=$(LoomFor $mc)" '-Pstrict_mixins=false' *>&1 | Tee-Object -FilePath $log | Out-Host
   $code = $LASTEXITCODE
   Pop-Location
