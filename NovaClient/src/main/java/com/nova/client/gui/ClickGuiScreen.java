@@ -148,7 +148,7 @@ public class ClickGuiScreen extends NovaScreen {
 
         // ---- cards ----
         List<Module> list = filtered();
-        ctx.enableScissor(gx - 2, gy, gx + gw + 2, gy + gh);
+        ctx.scissorOn(gx - 2, gy, gx + gw + 2, gy + gh);
         if (list.isEmpty()) Ui.centered(ctx, textRenderer, "No modules found", gx + gw / 2, gy + 30, Ui.MUTED, 1f);
         for (int i = 0; i < list.size(); i++) {
             Module m = list.get(i);
@@ -186,7 +186,7 @@ public class ClickGuiScreen extends NovaScreen {
                 for (int d = 0; d < 3; d++) ctx.fill(cx + cw - 12, y + 7 + d * 4, cx + cw - 10, y + 9 + d * 4, dc);
             }
         }
-        ctx.disableScissor();
+        ctx.scissorOff();
 
         int ms = maxScroll();
         if (ms > 0) {

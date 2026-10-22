@@ -119,7 +119,7 @@ public final class Gfx extends DrawableHelper {
     }
 
     // ---------- clipping ----------
-    public void enableScissor(int x1, int y1, int x2, int y2) {
+    public void scissorOn(int x1, int y1, int x2, int y2) {
         //#if MC >= 2000
         dc.enableScissor(x1, y1, x2, y2);
         //#else
@@ -130,7 +130,7 @@ public final class Gfx extends DrawableHelper {
         //#endif
     }
 
-    public void disableScissor() {
+    public void scissorOff() {
         //#if MC >= 2000
         dc.disableScissor();
         //#else

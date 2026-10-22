@@ -99,7 +99,8 @@ jobs:
           else
             echo "- FAILED    ${{ matrix.mc }}  (download the artifact FAILED-log-${{ matrix.mc }} and send it to whoever maintains the code)" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
-            grep -E "error:|FAILURE|What went wrong|Could not|not found" NovaClient/build.log | head -8 >> "$GITHUB_STEP_SUMMARY" || true
+            grep -E "error:" NovaClient/build.log | sort -u | head -15 >> "$GITHUB_STEP_SUMMARY" || true
+            grep -A10 "What went wrong" NovaClient/build.log | head -14 >> "$GITHUB_STEP_SUMMARY" || true
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           fi
 

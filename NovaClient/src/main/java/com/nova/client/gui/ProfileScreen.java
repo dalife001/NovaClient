@@ -81,7 +81,7 @@ public class ProfileScreen extends NovaScreen {
         Ui.text(ctx, textRenderer, badge, rx + 6, py + 40, online ? Ui.GREEN : Ui.AMBER, e1);
         long since = Config.get().firstLaunch;
         if (since > 0) {
-            String m = "Member since " + LocalDate.ofInstant(Instant.ofEpochMilli(since), ZoneId.systemDefault());
+            String m = "Member since " + Instant.ofEpochMilli(since).atZone(ZoneId.systemDefault()).toLocalDate();
             Ui.text(ctx, textRenderer, m, rx + bw + 8, py + 40, Ui.MUTED, e1);
         }
 
