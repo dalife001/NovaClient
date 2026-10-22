@@ -11,7 +11,9 @@ final class LauncherConfig {
     String refreshToken = "";
     String offlineName = "Player";
     /** URL of latest.json (see README) that tells the launcher the newest Nova version. */
-    String manifestUrl = "";
+    String manifestUrl = DEFAULT_MANIFEST;
+    /** The release pipeline writes this repo's latest.json address here at build time, so players need no setup. */
+    static final String DEFAULT_MANIFEST = "";
     /** Optional: a locally built novaclient jar to use instead of downloading. */
     String localModJar = "";
     /** Optional: force a Minecraft version; blank = whatever the manifest says. */
@@ -39,6 +41,7 @@ final class LauncherConfig {
                 c.refreshToken = s(m, "refreshToken", c.refreshToken);
                 c.offlineName = s(m, "offlineName", c.offlineName);
                 c.manifestUrl = s(m, "manifestUrl", c.manifestUrl);
+                if (c.manifestUrl.isBlank()) c.manifestUrl = DEFAULT_MANIFEST;
                 c.localModJar = s(m, "localModJar", c.localModJar);
                 c.mcVersion = s(m, "mcVersion", c.mcVersion);
                 c.backgroundPath = s(m, "backgroundPath", c.backgroundPath);

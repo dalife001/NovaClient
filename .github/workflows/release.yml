@@ -115,6 +115,11 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+      - name: Point the launcher at this repo's releases
+        run: |
+          URL="https://github.com/${{ github.repository }}/releases/latest/download/latest.json"
+          sed -i "s#DEFAULT_MANIFEST = \"\";#DEFAULT_MANIFEST = \"$URL\";#" NovaLauncher/src/com/nova/launcher/LauncherConfig.java
+          grep -n "DEFAULT_MANIFEST =" NovaLauncher/src/com/nova/launcher/LauncherConfig.java
       - name: Build launcher
         working-directory: NovaLauncher
         run: bash ./build.sh
