@@ -154,13 +154,21 @@ final class ModsDialog extends JDialog {
 
     private void reload() {
         rows.clear();
+        int[] hidden = {0};
         try (Stream<Path> s = Files.isDirectory(dir) ? Files.list(dir) : Stream.<Path>empty()) {
             s.filter(f -> { String n = f.getFileName().toString(); return n.endsWith(".jar") || n.endsWith(".jar.disabled"); })
                     .sorted(Comparator.comparing(f -> f.getFileName().toString().toLowerCase()))
-                    .forEach(f -> rows.add(new Row(f, f.getFileName().toString().endsWith(".jar"), JarInfo.read(f))));
+                    .forEach(f -> {
+                        boolean on = f.getFileName().toString().endsWith(".jar");
+                        JarInfo info = JarInfo.read(f);
+                        // switched-off jars built for other Minecraft versions are just clutter: hide them
+                        if (!on && info != null && !info.supports(mc.get())) { hidden[0]++; return; }
+                        rows.add(new Row(f, on, info));
+                    });
         } catch (IOException ignored) {}
         model.fireTableDataChanged();
-        header.setText("Minecraft " + mc.get() + "  \u00B7  " + rows.size() + " mod" + (rows.size() == 1 ? "" : "s") + " in " + dir);
+        header.setText("Minecraft " + mc.get() + "  \u00B7  " + rows.size() + " mod" + (rows.size() == 1 ? "" : "s")
+                + (hidden[0] > 0 ? " (" + hidden[0] + " for other versions hidden)" : "") + " in " + dir);
     }
 
     private void toggle(int r, boolean on) {
