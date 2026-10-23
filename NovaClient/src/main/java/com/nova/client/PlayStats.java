@@ -1,7 +1,7 @@
 package com.nova.client;
 
 import com.nova.client.config.Config;
-import net.minecraft.client.Minecraft;
+import net.minecraft.client.MinecraftClient;
 
 /** Tracks time played and turns it into a fun "Nova level". */
 public final class PlayStats {
@@ -16,7 +16,7 @@ public final class PlayStats {
         Config.save();
     }
 
-    public static void tick(Minecraft mc) {
+    public static void tick(MinecraftClient mc) {
         if (mc.player == null) return;
         if (++ticks >= 20) {
             ticks = 0;

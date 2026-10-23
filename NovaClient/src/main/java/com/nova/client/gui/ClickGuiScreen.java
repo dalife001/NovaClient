@@ -5,14 +5,14 @@ import com.nova.client.NovaClient;
 import com.nova.client.module.HudModule;
 import com.nova.client.module.Module;
 import com.nova.client.module.NumberSetting;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.widget.TextFieldWidget;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.Screen;
 
 /** The module menu: search, tabs, animated cards and a settings drawer. Opens with Right Shift. */
 public class ClickGuiScreen extends NovaScreen {
@@ -21,7 +21,7 @@ public class ClickGuiScreen extends NovaScreen {
 
     private int tab;
     private String search = "";
-    private EditBox field;
+    private TextFieldWidget field;
     private float scroll, scrollTarget, tabX = -1, tabW = 20, drawer;
     private Module selected;
     private final Map<Module, Float> on = new HashMap<>(), hov = new HashMap<>();
@@ -36,16 +36,16 @@ public class ClickGuiScreen extends NovaScreen {
 
     @Override
     protected void build() {
-        field = new EditBox(font, 0, 0, 120, 16, Mc.text("Search"));
+        field = new TextFieldWidget(textRenderer, 0, 0, 120, 16, Mc.text("Search"));
         hint(field, "Search modules");
-        field.setValue(search);
-        field.setResponder(s -> { search = s; scrollTarget = 0; });
+        field.setText(search);
+        field.setChangedListener(s -> { search = s; scrollTarget = 0; });
         addField(field);
 
         editorBtn = button(0, 0, 86, 16, "HUD Editor", AnimButton.Style.SECONDARY, () -> {
-            if (minecraft.player != null) Mc.setScreen(minecraft, new HudEditorScreen(this));
+            if (client.player != null) Mc.setScreen(client, new HudEditorScreen(this));
         });
-        editorBtn.enabled = minecraft.player != null;
+        editorBtn.enabled = client.player != null;
 
         toggleBtn = new AnimButton(0, 0, DW - 20, 20, "", AnimButton.Style.SECONDARY, () -> { if (selected != null) toggle(selected); });
         resetBtn = new AnimButton(0, 0, DW - 20, 18, "Reset position", AnimButton.Style.SECONDARY, () -> {
@@ -91,7 +91,7 @@ public class ClickGuiScreen extends NovaScreen {
 
     private int tabX(int i) {
         int x = px + 14;
-        for (int k = 0; k < i; k++) x += font.width(TABS[k]) + 22;
+        for (int k = 0; k < i; k++) x += textRenderer.getWidth(TABS[k]) + 22;
         return x;
     }
 
@@ -122,12 +122,12 @@ public class ClickGuiScreen extends NovaScreen {
 
     @Override
     protected void drawFront(Gfx ctx, int mx, int my, float delta) {
-        Ui.text(ctx, font, "Modules", px + 24, py + 11, Ui.TEXT, 1f);
+        Ui.text(ctx, textRenderer, "Modules", px + 24, py + 11, Ui.TEXT, 1f);
         Ui.sparkle(ctx, px + 16, py + 15, 2, Ui.a(Theme.light(Ui.CYAN), 0.6f + 0.4f * Anim.breathe(4f, 0f)));
 
         // ---- tabs: a soft pill glides under the active one ----
         for (int i = 0; i < TABS.length; i++) {
-            int x = tabX(i), w = font.width(TABS[i]);
+            int x = tabX(i), w = textRenderer.getWidth(TABS[i]);
             if (i == tab) {
                 if (tabX < 0) { tabX = x; tabW = w; }
                 tabX = Anim.approach(tabX, x, dt, 12f);
@@ -139,17 +139,17 @@ public class ClickGuiScreen extends NovaScreen {
             Ui.rim(ctx, (int) tabX - 7, py + 35, (int) tabW + 14, 17, 8, Ui.a(Ui.ACCENT, 0.45f));
         }
         for (int i = 0; i < TABS.length; i++) {
-            int x = tabX(i), w = font.width(TABS[i]);
+            int x = tabX(i), w = textRenderer.getWidth(TABS[i]);
             boolean active = i == tab;
             boolean h = Ui.inside(mx, my, x - 6, py + 36, w + 12, 18);
-            Ui.text(ctx, font, TABS[i], x, py + 40, active ? Ui.TEXT : h ? 0xFFD8D4EE : Ui.MUTED, 1f);
+            Ui.text(ctx, textRenderer, TABS[i], x, py + 40, active ? Ui.TEXT : h ? 0xFFD8D4EE : Ui.MUTED, 1f);
         }
         ctx.fill(px + 14, py + 56, px + pw - 14, py + 57, Ui.glass(0.07f));
 
         // ---- cards ----
         List<Module> list = filtered();
         ctx.scissorOn(gx - 2, gy, gx + gw + 2, gy + gh);
-        if (list.isEmpty()) Ui.centered(ctx, font, "No modules found", gx + gw / 2, gy + 30, Ui.MUTED, 1f);
+        if (list.isEmpty()) Ui.centered(ctx, textRenderer, "No modules found", gx + gw / 2, gy + 30, Ui.MUTED, 1f);
         for (int i = 0; i < list.size(); i++) {
             Module m = list.get(i);
             int cx = gx + (i % cols) * (cw + GAP);
@@ -171,8 +171,8 @@ public class ClickGuiScreen extends NovaScreen {
             Ui.rim(ctx, cx, y, cw, CH, 7, Ui.a(rimc, e));
             if (onv > 0.02f) Ui.rrect(ctx, cx + 4, y + 9, 2, CH - 18, 1, Ui.a(Ui.ACCENT, onv * e));
 
-            Ui.text(ctx, font, m.name, cx + 12, y + 8, Ui.TEXT, e);
-            Ui.text(ctx, font, font.plainSubstrByWidth(m.description, cw - 22), cx + 12, y + 20, Ui.MUTED, e);
+            Ui.text(ctx, textRenderer, m.name, cx + 12, y + 8, Ui.TEXT, e);
+            Ui.text(ctx, textRenderer, textRenderer.trimToWidth(m.description, cw - 22), cx + 12, y + 20, Ui.MUTED, e);
 
             // soft pill switch
             int sx = cx + cw - 36, sy = y + CH - 15;
@@ -206,20 +206,20 @@ public class ClickGuiScreen extends NovaScreen {
 
         Ui.rrect(ctx, dx, dy, DW, gh, 8, Ui.a(0xFF15122F, a));
         Ui.rim(ctx, dx, dy, DW, gh, 8, Ui.glass(0.14f * a));
-        Ui.text(ctx, font, m.name, dx + 10, dy + 10, Ui.TEXT, a);
-        Ui.text(ctx, font, m.category(), dx + DW - 10 - font.width(m.category()), dy + 10, Ui.ACCENT, a);
+        Ui.text(ctx, textRenderer, m.name, dx + 10, dy + 10, Ui.TEXT, a);
+        Ui.text(ctx, textRenderer, m.category(), dx + DW - 10 - textRenderer.getWidth(m.category()), dy + 10, Ui.ACCENT, a);
 
         toggleBtn.x = dx + 10;
         toggleBtn.y = dy + 26;
         toggleBtn.label = m.isEnabled() ? "Enabled" : "Disabled";
-        toggleBtn.draw(ctx, font, mx, my, a, 0);
+        toggleBtn.draw(ctx, textRenderer, mx, my, a, 0);
         if (m.isEnabled()) Ui.rrect(ctx, toggleBtn.x + 8, toggleBtn.y + 17, toggleBtn.w - 16, 1, 0, Ui.a(Ui.GREEN, a * 0.8f));
 
         int sy = dy + 58;
         for (NumberSetting s : m.settings) {
             String val = s.step >= 1 ? String.valueOf((int) s.get()) : String.format("%.2f", s.get());
-            Ui.text(ctx, font, s.name, dx + 10, sy, Ui.MUTED, a);
-            Ui.text(ctx, font, val, dx + DW - 10 - font.width(val), sy, Ui.TEXT, a);
+            Ui.text(ctx, textRenderer, s.name, dx + 10, sy, Ui.MUTED, a);
+            Ui.text(ctx, textRenderer, val, dx + DW - 10 - textRenderer.getWidth(val), sy, Ui.TEXT, a);
             int tx = dx + 10, tw = DW - 20, ty = sy + 14;
             int fw = (int) (tw * s.fraction());
             Ui.bar(ctx, tx, ty, tw, 6, (float) s.fraction(), a);
@@ -229,8 +229,8 @@ public class ClickGuiScreen extends NovaScreen {
         if (m instanceof HudModule) {
             resetBtn.x = dx + 10;
             resetBtn.y = dy + gh - 28;
-            resetBtn.draw(ctx, font, mx, my, a, 0);
-            Ui.text(ctx, font, "Drag it in the HUD Editor", dx + 10, dy + gh - 42, Ui.MUTED, a * 0.8f);
+            resetBtn.draw(ctx, textRenderer, mx, my, a, 0);
+            Ui.text(ctx, textRenderer, "Drag it in the HUD Editor", dx + 10, dy + gh - 42, Ui.MUTED, a * 0.8f);
         }
     }
 
@@ -241,7 +241,7 @@ public class ClickGuiScreen extends NovaScreen {
             layout();
             // tabs
             for (int i = 0; i < TABS.length; i++) {
-                if (Ui.inside(mx, my, tabX(i) - 6, py + 36, font.width(TABS[i]) + 12, 18)) {
+                if (Ui.inside(mx, my, tabX(i) - 6, py + 36, textRenderer.getWidth(TABS[i]) + 12, 18)) {
                     tab = i; scrollTarget = 0; click();
                     return true;
                 }

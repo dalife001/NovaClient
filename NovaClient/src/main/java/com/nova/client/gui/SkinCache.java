@@ -4,8 +4,9 @@ import com.google.gson.JsonObject;
 import com.nova.client.compat.Mc;
 import com.nova.client.util.Net;
 import com.nova.client.util.S;
+import net.minecraft.client.MinecraftClient;
+
 import javax.imageio.ImageIO;
-import net.minecraft.client.Minecraft;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.util.Base64;
@@ -21,8 +22,8 @@ public final class SkinCache {
 
     /** Call every frame: starts a background load when the account changed. */
     public static void ensure() {
-        Minecraft mc = Minecraft.getInstance();
-        String name = mc.getUser().getName();
+        MinecraftClient mc = MinecraftClient.getInstance();
+        String name = mc.getSession().getUsername();
         if (name.equals(forName) || loading || System.currentTimeMillis() < retryAt) return;
         if (!Mc.online(mc)) { // offline names have no real skin
             forName = name;
@@ -65,8 +66,8 @@ public final class SkinCache {
         int[] p = pixels;
         if (p == null) {
             Ui.round(c, x, y, size, size, Ui.a(Ui.ACCENT_DARK, alpha));
-            String n = Minecraft.getInstance().getUser().getName();
-            Ui.centered(c, Minecraft.getInstance().font, n.isEmpty() ? "?" : n.substring(0, 1).toUpperCase(),
+            String n = MinecraftClient.getInstance().getSession().getUsername();
+            Ui.centered(c, MinecraftClient.getInstance().textRenderer, n.isEmpty() ? "?" : n.substring(0, 1).toUpperCase(),
                     x + size / 2, y + (size - 8) / 2, Ui.TEXT, alpha);
             return;
         }

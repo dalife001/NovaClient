@@ -200,13 +200,13 @@ public final class LauncherApp {
         Embedded emb = Embedded.load();
         Map<String, NovaManifest.Build> builds = m == null ? Map.of() : m.builds();
         String embMc = emb == null ? null : emb.minecraft;
-        new VersionDialog(frame, vl, cfg.mcVersion, builds, embMc, picked -> {
+        new VersionDialog(frame, vl, cfg.mcVersion.isBlank() ? displayMc() : cfg.mcVersion, builds, embMc, picked -> {
             cfg.mcVersion = picked;
             cfg.save();
             orbit.mc = displayMc();
             String mc = orbit.mc;
             String tag = VersionDialog.tagFor(mc, builds, embMc);
-            orbit.status = "Minecraft " + mc + (picked.isBlank() ? " (automatic)" : "");
+            orbit.status = "Minecraft " + mc;
             if (tag.equals("Fabric only")) orbit.note = "No Nova build for " + mc + " yet \u00B7 it will start as plain Fabric";
             else if (tag.contains("experimental")) orbit.note = "Nova for " + mc + " is experimental: some features may be missing";
             else orbit.note = "Nova Client is available for " + mc;

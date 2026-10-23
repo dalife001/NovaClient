@@ -4,15 +4,16 @@ import com.nova.client.compat.Mc;
 import com.nova.client.NovaClient;
 import com.nova.client.PlayStats;
 import com.nova.client.UpdateChecker;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen;
+import net.minecraft.client.gui.screen.option.OptionsScreen;
+import net.minecraft.client.gui.screen.world.SelectWorldScreen;
+import net.minecraft.client.network.ServerInfo;
+import net.minecraft.client.option.ServerList;
+
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
-import net.minecraft.client.gui.screens.options.OptionsScreen;
-import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen;
-import net.minecraft.client.multiplayer.ServerData;
-import net.minecraft.client.multiplayer.ServerList;
 
 /**
  * The Nova hub. A quiet left column (logo, two big doors, a few small pills) in front of a slow night sky
@@ -62,20 +63,20 @@ public class NovaTitleScreen extends NovaScreen {
         int y = logoY + (int) (8 * logoScale) + (compact ? 22 : 38);
 
         add(new AnimButton(left, y, colW, rowH, "Singleplayer", AnimButton.Style.ROW,
-                () -> Mc.setScreen(minecraft, new SelectWorldScreen(this))).sub("Your worlds").icon(6), 0.35f);
+                () -> Mc.setScreen(client, new SelectWorldScreen(this))).sub("Your worlds").icon(6), 0.35f);
         y += rowH + 2;
         add(new AnimButton(left, y, colW, rowH, "Multiplayer", AnimButton.Style.ROW,
-                () -> Mc.setScreen(minecraft, new JoinMultiplayerScreen(this))).sub("Servers and friends").icon(7), 0.43f);
+                () -> Mc.setScreen(client, new MultiplayerScreen(this))).sub("Servers and friends").icon(7), 0.43f);
         y += rowH + (compact ? 8 : 12);
 
         String[] names = {"Mods", "Friends", "Skins", "Textures", "Shaders", "Settings"};
         Runnable[] acts = {
-                () -> Mc.setScreen(minecraft, new ClickGuiScreen(this)),
-                () -> Mc.setScreen(minecraft, new FriendsScreen(this)),
-                () -> Mc.setScreen(minecraft, new SkinScreen(this)),
+                () -> Mc.setScreen(client, new ClickGuiScreen(this)),
+                () -> Mc.setScreen(client, new FriendsScreen(this)),
+                () -> Mc.setScreen(client, new SkinScreen(this)),
                 this::openPacks,
                 this::openShaders,
-                () -> Mc.setScreen(minecraft, new SettingsScreen(this))};
+                () -> Mc.setScreen(client, new SettingsScreen(this))};
         int gap = 6, pw = (colW - 2 * gap) / 3, ph = 18;
         for (int i = 0; i < 6; i++) {
             int px = left + (i % 3) * (pw + gap), py = y + (i / 3) * (ph + 5);
@@ -85,24 +86,24 @@ public class NovaTitleScreen extends NovaScreen {
 
         // Jump back in: your saved servers
         try {
-            ServerList sl = new ServerList(minecraft);
-            sl.load();
+            ServerList sl = new ServerList(client);
+            sl.loadFile();
             int n = Math.min(2, sl.size());
             if (n > 0 && y + 28 < height - 24) {
                 chipLabelY = y;
                 int chipW = (colW - gap * (n - 1)) / n;
                 for (int i = 0; i < n; i++) {
-                    ServerData info = sl.get(i);
-                    String label = font.plainSubstrByWidth(info.name, chipW - 14);
+                    ServerInfo info = sl.get(i);
+                    String label = textRenderer.trimToWidth(info.name, chipW - 14);
                     add(new AnimButton(left + i * (chipW + gap), y + 12, chipW, 16, label, AnimButton.Style.PILL, () ->
-                            Mc.connect(this, minecraft, info)), 0.9f + i * 0.05f);
+                            Mc.connect(this, client, info)), 0.9f + i * 0.05f);
                 }
             }
         } catch (Throwable ignored) {}
 
         add(new AnimButton(width - 112, height - 22, 50, 16, "Options", AnimButton.Style.GHOST,
-                () -> Mc.setScreen(minecraft, new OptionsScreen(this, minecraft.options))), 1.0f);
-        add(new AnimButton(width - 58, height - 22, 44, 16, "Quit", AnimButton.Style.GHOST, () -> minecraft.stop()), 1.0f);
+                () -> Mc.setScreen(client, new OptionsScreen(this, client.options))), 1.0f);
+        add(new AnimButton(width - 58, height - 22, 44, 16, "Quit", AnimButton.Style.GHOST, () -> client.scheduleStop()), 1.0f);
 
         // the planet sits in the free space on the right
         int freeLeft = left + colW + 20;
@@ -112,13 +113,13 @@ public class NovaTitleScreen extends NovaScreen {
         planetY = (int) (height * 0.44f);
     }
 
-    private void openPacks() { Mc.openPacks(minecraft, this); }
+    private void openPacks() { Mc.openPacks(client, this); }
 
     /** Opens Iris's shader pack screen (looked up by name so the menu never breaks if Iris changes). */
     private void openShaders() {
         try {
             Class<?> c = Class.forName("net.irisshaders.iris.gui.screen.ShaderPackScreen");
-            Mc.setScreen(minecraft, (Screen) c.getConstructor(Screen.class).newInstance(this));
+            Mc.setScreen(client, (Screen) c.getConstructor(Screen.class).newInstance(this));
         } catch (Throwable t) {
             Toasts.push("Shaders", "Iris is not loaded", Ui.RED);
         }
@@ -127,7 +128,7 @@ public class NovaTitleScreen extends NovaScreen {
     private String greeting() {
         int h = LocalTime.now().getHour();
         String g = h < 5 ? "Still up" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
-        return g + ", " + minecraft.getUser().getName();
+        return g + ", " + client.getSession().getUsername();
     }
 
     /** The planet lives in the background layer so it is always behind the menu. */
@@ -150,36 +151,36 @@ public class NovaTitleScreen extends NovaScreen {
         float e0 = Anim.stagger(t, 0f, 1.0f);
         float lx = left + 1;
         float ly = logoY - (1f - e0) * 10f;
-        Ui.flow(ctx, font, "nova", lx, ly, logoScale, 3f, e0, true);
-        float lw = Ui.flowWidth(font, "nova", logoScale, 3f);
+        Ui.flow(ctx, textRenderer, "nova", lx, ly, logoScale, 3f, e0, true);
+        float lw = Ui.flowWidth(textRenderer, "nova", logoScale, 3f);
         Ui.sparkle(ctx, (int) (lx + lw + 2), (int) (logoY + 2 + Math.sin(Anim.seconds() * 1.1) * 1.5),
                 1 + (int) (1.6f * Anim.breathe(4f, 0f)), Ui.a(Theme.light(Ui.CYAN), e0));
         float e1 = Anim.stagger(t, 0.25f, 0.9f);
         int tagY = logoY + (int) (8 * logoScale) + 5;
-        Ui.text(ctx, font, "a quieter way to play", left + 2, tagY, Ui.MUTED, e1);
-        if (!compact) Ui.text(ctx, font, greeting(), left + 2, tagY + 13, Theme.light(Ui.ACCENT), e1 * 0.85f);
+        Ui.text(ctx, textRenderer, "a quieter way to play", left + 2, tagY, Ui.MUTED, e1);
+        if (!compact) Ui.text(ctx, textRenderer, greeting(), left + 2, tagY + 13, Theme.light(Ui.ACCENT), e1 * 0.85f);
 
         // ---- menu ----
         for (int i = 0; i < hub.size(); i++) {
             float e = Anim.stagger(t, delays.get(i), 0.7f);
-            hub.get(i).draw(ctx, font, mx, my, e, (int) ((1f - e) * 8));
+            hub.get(i).draw(ctx, textRenderer, mx, my, e, (int) ((1f - e) * 8));
         }
-        if (chipLabelY >= 0) Ui.text(ctx, font, "Jump back in", left + 2, chipLabelY, Ui.MUTED, Anim.stagger(t, 0.85f, 0.6f));
+        if (chipLabelY >= 0) Ui.text(ctx, textRenderer, "Jump back in", left + 2, chipLabelY, Ui.MUTED, Anim.stagger(t, 0.85f, 0.6f));
 
         // ---- version chip (top left) ----
         float ev = Anim.stagger(t, 0.1f, 0.7f);
         String ver = "v" + NovaClient.VERSION;
-        int vw = font.width(ver) + 14;
+        int vw = textRenderer.getWidth(ver) + 14;
         Ui.rrect(ctx, 10, 10, vw, 16, 8, Ui.glass(0.07f * ev));
         Ui.rim(ctx, 10, 10, vw, 16, 8, Ui.glass(0.12f * ev));
-        Ui.text(ctx, font, ver, 17, 14, Ui.MUTED, ev);
+        Ui.text(ctx, textRenderer, ver, 17, 14, Ui.MUTED, ev);
         if (UpdateChecker.available()) {
             String up = "Update " + UpdateChecker.latest + " ready";
-            int uw = font.width(up) + 14;
+            int uw = textRenderer.getWidth(up) + 14;
             float pu = 0.7f + 0.3f * Anim.breathe(3f, 0f);
             Ui.rrect(ctx, 10 + vw + 5, 9, uw + 2, 18, 9, Ui.a(Ui.GREEN, 0.16f * pu * ev));
             Ui.rrect(ctx, 10 + vw + 6, 10, uw, 16, 8, Ui.a(0xFF0F2F27, 0.85f * ev));
-            Ui.text(ctx, font, up, 17 + vw + 6, 14, Ui.GREEN, ev);
+            Ui.text(ctx, textRenderer, up, 17 + vw + 6, 14, Ui.GREEN, ev);
         }
 
         // ---- profile pill (top right) ----
@@ -188,15 +189,15 @@ public class NovaTitleScreen extends NovaScreen {
         // ---- rotating tips ----
         float phase = t % 7f;
         float ta = Math.min(1f, Math.min(phase / 0.9f, (7f - phase) / 0.9f)) * Anim.stagger(t, 1.0f, 0.6f);
-        Ui.text(ctx, font, TIPS[(int) (t / 7f) % TIPS.length], left + 2, height - 20, Ui.MUTED, ta * 0.9f);
+        Ui.text(ctx, textRenderer, TIPS[(int) (t / 7f) % TIPS.length], left + 2, height - 20, Ui.MUTED, ta * 0.9f);
     }
 
     private void drawPill(Gfx ctx, int mx, int my, float e) {
         long now = System.nanoTime();
         float dt = Math.min(0.1f, (now - pillLast) / 1e9f);
         pillLast = now;
-        String name = minecraft.getUser().getName();
-        pillW = Math.max(96, 34 + font.width(name) + 10);
+        String name = client.getSession().getUsername();
+        pillW = Math.max(96, 34 + textRenderer.getWidth(name) + 10);
         pillH = 26;
         pillX = width - pillW - 10;
         pillY = 10;
@@ -207,8 +208,8 @@ public class NovaTitleScreen extends NovaScreen {
         Ui.rrect(ctx, pillX, pillY, pillW, pillH, 9, Ui.glass((0.07f + 0.06f * h) * e));
         Ui.rim(ctx, pillX, pillY, pillW, pillH, 9, Ui.a(Anim.lerpColor(0x33FFFFFF, Ui.ACCENT, h * 0.8f), e));
         SkinCache.drawHead(ctx, pillX + 3, pillY + 3, 20, e);
-        Ui.text(ctx, font, name, pillX + 28, pillY + 4, Ui.TEXT, e);
-        Ui.text(ctx, font, "Level " + PlayStats.level(), pillX + 28, pillY + 14, Ui.MUTED, e);
+        Ui.text(ctx, textRenderer, name, pillX + 28, pillY + 4, Ui.TEXT, e);
+        Ui.text(ctx, textRenderer, "Level " + PlayStats.level(), pillX + 28, pillY + 14, Ui.MUTED, e);
         Ui.bar(ctx, pillX + 28, pillY + 22, pillW - 36, 2, PlayStats.progress(), e);
     }
 
@@ -217,7 +218,7 @@ public class NovaTitleScreen extends NovaScreen {
         if (button == 0) {
             if (Ui.inside(mx, my, pillX, pillY, pillW, pillH)) {
                 click();
-                Mc.setScreen(minecraft, new ProfileScreen(this));
+                Mc.setScreen(client, new ProfileScreen(this));
                 return true;
             }
             for (AnimButton b : hub) {

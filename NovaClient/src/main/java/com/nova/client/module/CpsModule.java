@@ -1,10 +1,10 @@
 package com.nova.client.module;
 
+import net.minecraft.client.MinecraftClient;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
-import net.minecraft.client.Minecraft;
 
 /** Clicks per second (left | right). Reads the mouse every frame, so fast clicking is counted. */
 public class CpsModule extends SimpleHudModule {
@@ -14,12 +14,12 @@ public class CpsModule extends SimpleHudModule {
 
     public CpsModule() { super("CPS", "Clicks per second counter", true, 6, 46, false, false); }
 
-    private void poll(Minecraft mc) {
+    private void poll(MinecraftClient mc) {
         long now = System.currentTimeMillis();
-        long window = mc.getWindow().handle();
+        long window = mc.getWindow().getHandle();
         boolean l = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS;
         boolean r = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS;
-        if (mc.screen == null) {
+        if (mc.currentScreen == null) {
             if (l && !prevLeft) left.addLast(now);
             if (r && !prevRight) right.addLast(now);
         }
@@ -30,7 +30,7 @@ public class CpsModule extends SimpleHudModule {
     }
 
     @Override protected String label() { return "CPS"; }
-    @Override protected String value(Minecraft mc) {
+    @Override protected String value(MinecraftClient mc) {
         poll(mc);
         return left.size() + " | " + right.size();
     }

@@ -4,8 +4,8 @@ import com.nova.client.compat.Mc;
 import com.nova.client.NovaClient;
 import com.nova.client.UpdateChecker;
 import com.nova.client.config.Config;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.widget.TextFieldWidget;
 
 public class SettingsScreen extends NovaScreen {
     private static final int W = 380;
@@ -22,11 +22,11 @@ public class SettingsScreen extends NovaScreen {
     protected void build() {
         int x = px() + 20, w = W - 40;
 
-        EditBox bg = new EditBox(font, x, py() + 52, w, 20, Mc.text("Background"));
+        TextFieldWidget bg = new TextFieldWidget(textRenderer, x, py() + 52, w, 20, Mc.text("Background"));
         bg.setMaxLength(512);
         hint(bg, "C:\\path\\to\\wallpaper.png (png or jpg)");
-        bg.setValue(bgText);
-        bg.setResponder(s -> bgText = s);
+        bg.setText(bgText);
+        bg.setChangedListener(s -> bgText = s);
         addField(bg);
 
         int half = (w - 5) / 2;
@@ -45,11 +45,11 @@ public class SettingsScreen extends NovaScreen {
             status = "Background removed";
         });
 
-        EditBox url = new EditBox(font, x, py() + 126, w, 20, Mc.text("Update URL"));
+        TextFieldWidget url = new TextFieldWidget(textRenderer, x, py() + 126, w, 20, Mc.text("Update URL"));
         url.setMaxLength(512);
         hint(url, "https://.../latest.json (the launcher sets this for you)");
-        url.setValue(urlText);
-        url.setResponder(s -> urlText = s);
+        url.setText(urlText);
+        url.setChangedListener(s -> urlText = s);
         addField(url);
 
         button(x, py() + 150, half, 20, "Save + check updates", true, () -> {
@@ -59,7 +59,7 @@ public class SettingsScreen extends NovaScreen {
             status = "Checking for updates...";
         });
         button(x + half + 5, py() + 150, half, 20, "Open mods folder", false, () ->
-                net.minecraft.util.Util.getPlatform().openFile(
+                net.minecraft.util.Util.getOperatingSystem().open(
                         net.fabricmc.loader.api.FabricLoader.getInstance().getGameDir().resolve("mods").toFile()));
 
         button(width / 2 - 50, py() + 196, 100, 22, "Back", false, this::nClose);
@@ -74,14 +74,14 @@ public class SettingsScreen extends NovaScreen {
     @Override
     protected void drawFront(Gfx ctx, int mx, int my, float delta) {
         int cx = width / 2;
-        ctx.drawCenteredTextWithShadow(font, "Settings", cx, py() + 9, Ui.TEXT);
-        ctx.drawTextWithShadow(font, "Custom background image", px() + 20, py() + 38, Ui.MUTED);
-        ctx.drawTextWithShadow(font, "Update source", px() + 20, py() + 112, Ui.MUTED);
+        ctx.drawCenteredTextWithShadow(textRenderer, "Settings", cx, py() + 9, Ui.TEXT);
+        ctx.drawTextWithShadow(textRenderer, "Custom background image", px() + 20, py() + 38, Ui.MUTED);
+        ctx.drawTextWithShadow(textRenderer, "Update source", px() + 20, py() + 112, Ui.MUTED);
         String line = UpdateChecker.available()
                 ? "Update available: " + UpdateChecker.latest + " (you have " + NovaClient.VERSION + ")"
                 : "Version " + NovaClient.VERSION + " - " + UpdateChecker.note;
-        ctx.drawTextWithShadow(font, font.plainSubstrByWidth(line, W - 40), px() + 20, py() + 176 - 4,
+        ctx.drawTextWithShadow(textRenderer, textRenderer.trimToWidth(line, W - 40), px() + 20, py() + 176 - 4,
                 UpdateChecker.available() ? Ui.GREEN : Ui.MUTED);
-        if (!status.isEmpty()) ctx.drawCenteredTextWithShadow(font, status, cx, py() + 224, Ui.GREEN);
+        if (!status.isEmpty()) ctx.drawCenteredTextWithShadow(textRenderer, status, cx, py() + 224, Ui.GREEN);
     }
 }

@@ -1,0 +1,79 @@
+# Builds Nova Client for Minecraft 26.x (unobfuscated versions) from the NovaClient26 folder.
+# Actions tab > "Build 26.x" > Run workflow > type the version (26.1, 26.1.2, 26.2, 26.3 ...).
+# Green = the jar is an artifact of the run. Red = the summary lists every compile error; send them to whoever maintains the code.
+name: Build 26.x
+on:
+  workflow_dispatch:
+    inputs:
+      mc:
+        description: 'Minecraft version (26.1, 26.1.2, 26.2, 26.3 ...)'
+        required: true
+        default: '26.1'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find the matching Fabric versions
+        id: v
+        run: |
+          MC='${{ github.event.inputs.mc }}'
+          UA="NovaClient-ci/1.0 (github.com/${{ github.repository }})"
+          LOADER=$(curl -fsS -A "$UA" "https://meta.fabricmc.net/v2/versions/loader/$MC" | jq -r '.[0].loader.version // empty' || true)
+          [ -n "$LOADER" ] || LOADER=$(curl -fsS -A "$UA" "https://meta.fabricmc.net/v2/versions/loader" | jq -r '[.[]|select(.stable)][0].version')
+          API=$(curl -fsS -A "$UA" -G "https://api.modrinth.com/v2/project/fabric-api/version" \
+                  --data-urlencode 'loaders=["fabric"]' --data-urlencode "game_versions=[\"$MC\"]" \
+                | jq -r '(([.[]|select(.version_type=="release")][0]) // .[0]).version_number // empty')
+          case "$MC" in 26.1*) LOOM=1.16-SNAPSHOT;; *) LOOM=1.17-SNAPSHOT;; esac
+          echo "Minecraft $MC | loader $LOADER | Fabric API $API | Loom $LOOM"
+          if [ -z "$API" ]; then echo "There is no Fabric API for $MC yet."; exit 1; fi
+          {
+            echo "mc=$MC"
+            echo "loader=$LOADER"
+            echo "api=$API"
+            echo "loom=$LOOM"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: current
+      - name: Build Nova for Minecraft ${{ steps.v.outputs.mc }}
+        id: build
+        continue-on-error: true
+        working-directory: NovaClient26
+        run: |
+          set -o pipefail
+          gradle build --stacktrace --no-daemon \
+            -Pminecraft_version='${{ steps.v.outputs.mc }}' \
+            -Ploader_version='${{ steps.v.outputs.loader }}' \
+            -Pfabric_version='${{ steps.v.outputs.api }}' \
+            -Ploom_version='${{ steps.v.outputs.loom }}' \
+            -Pjava_version=25 -Pstrict_mixins=false 2>&1 | tee build.log
+      - name: Keep the build log
+        if: steps.build.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: FAILED-26-log-${{ steps.v.outputs.mc }}
+          path: NovaClient26/build.log
+      - name: Keep the jar
+        if: steps.build.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: novaclient-${{ steps.v.outputs.mc }}
+          path: NovaClient26/build/libs/novaclient-*.jar
+          if-no-files-found: error
+      - name: Summary
+        run: |
+          if [ "${{ steps.build.outcome }}" = "success" ]; then
+            echo "OK ${{ steps.v.outputs.mc }}: the jar is an artifact of this run" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "FAILED ${{ steps.v.outputs.mc }}  (loader ${{ steps.v.outputs.loader }}, Fabric API ${{ steps.v.outputs.api }}, Loom ${{ steps.v.outputs.loom }})" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            { grep -E "error:|symbol: |location: " NovaClient26/build.log | sed 's#.*/pp/java/##' | awk '!seen[$0]++' | head -200
+              grep -A12 "What went wrong" NovaClient26/build.log | head -16; } >> "$GITHUB_STEP_SUMMARY" || true
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi

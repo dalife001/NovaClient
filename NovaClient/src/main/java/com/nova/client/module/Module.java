@@ -1,9 +1,10 @@
 package com.nova.client.module;
 
 import com.nova.client.gui.Gfx;
+import net.minecraft.client.MinecraftClient;
+
 import java.util.ArrayList;
 import java.util.List;
-import net.minecraft.client.Minecraft;
 
 public abstract class Module {
     public final String name;
@@ -35,8 +36,8 @@ public abstract class Module {
 
     protected void onEnable() {}
     protected void onDisable() {}
-    public void onTick(Minecraft mc) {}
-    public void onRender(Gfx ctx, Minecraft mc) {}
+    public void onTick(MinecraftClient mc) {}
+    public void onRender(Gfx ctx, MinecraftClient mc) {}
 
     /** Used only to load the saved state without firing hooks. */
     void restore(boolean value) { this.enabled = value; }

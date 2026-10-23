@@ -1,0 +1,142 @@
+plugins {
+    id 'net.fabricmc.fabric-loom'
+}
+
+version = project.mod_version
+group = 'com.nova'
+base { archivesName = 'novaclient' }
+
+// ---------------------------------------------------------------------------------------------------------
+// Nova Client for Minecraft 26.x (unobfuscated: Mojang names, no mappings, no remapping, Java 25).
+// Same idea as the main project: one source tree, //#if MC >= 26200 style branches when 26.1 / 26.2 / 26.3 differ.
+//
+// The release pipeline passes the Minecraft version with -P (see .github/workflows/release.yml).
+// Version specific code lives in the SAME file, between marker comments:
+//
+//     //#if MC >= 2002
+//     ...code for 1.20.2 and newer...
+//     //#elseif MC >= 1900
+//     ...code for 1.19 up to 1.20.1...
+//     //#else
+//     ...code for everything older...
+//     //#endif
+//
+// MC here is major*10000 + minor*100 + patch: 26.1 = 26100, 26.1.2 = 26102, 26.2 = 26200, 26.3 = 26300.
+// The task `preprocess` below keeps the matching branch and writes the result to build/pp, which is
+// what actually gets compiled. Nothing in src/ is ever changed.
+// ---------------------------------------------------------------------------------------------------------
+def mcNumber = { String v ->
+    def p = v.tokenize('.')
+    return (p[0] as int) * 10000 + (p[1] as int) * 100 + (p.size() > 2 ? (p[2] as int) : 0)
+}
+final int MC = mcNumber(project.minecraft_version as String)
+
+// java_version : Java level the jar targets (26.x needs 25)
+// strict_mixins: true = a mixin that no longer fits stops the game (good for tested versions),
+//                false = it is skipped with a warning (used for untested versions so the game still starts)
+def javaVer      = (project.findProperty('java_version') ?: '25') as int
+def strictMixins = (project.findProperty('strict_mixins') ?: 'true') != 'false'
+
+def evalAtom = { String atom ->
+    def m = atom.trim() =~ /^MC\s*(>=|<=|==|!=|>|<)\s*(\d+)$/
+    if (!m.matches()) throw new GradleException("Bad preprocessor condition: '${atom}'")
+    int n = m.group(2) as int
+    switch (m.group(1)) {
+        case '>=': return MC >= n
+        case '<=': return MC <= n
+        case '==': return MC == n
+        case '!=': return MC != n
+        case '>':  return MC > n
+        default:   return MC < n
+    }
+}
+def evalCond = { String c -> c.split('\\|\\|').any { part -> part.split('&&').every { evalAtom(it) } } }
+
+def processText = { String text, String name ->
+    def out = new StringBuilder()
+    // each frame: [parentActive, taken (a branch already matched), active]
+    def stack = []
+    boolean active = true
+    int lineNo = 0
+    text.split('\n', -1).each { String line ->
+        lineNo++
+        def t = line.trim()
+        if (t.startsWith('//#if ')) {
+            boolean c = active && evalCond(t.substring(6))
+            stack.add([active, c, c]); active = c
+        } else if (t.startsWith('//#elseif ')) {
+            def f = stack.last()
+            boolean c = f[0] && !f[1] && evalCond(t.substring(10))
+            f[1] = f[1] || c; f[2] = c; active = c
+        } else if (t == '//#else') {
+            def f = stack.last()
+            boolean c = f[0] && !f[1]
+            f[1] = true; f[2] = c; active = c
+        } else if (t == '//#endif') {
+            if (stack.isEmpty()) throw new GradleException("${name}:${lineNo}: //#endif without //#if")
+            def f = stack.remove(stack.size() - 1); active = f[0]
+        } else if (active) {
+            out.append(line).append('\n')
+        }
+    }
+    if (!stack.isEmpty()) throw new GradleException("${name}: //#if without //#endif")
+    def s = out.toString()
+    return s.endsWith('\n') ? s.substring(0, s.length() - 1) : s
+}
+
+def ppRoot = layout.buildDirectory.dir('pp').get().asFile
+tasks.register('preprocess') {
+    inputs.dir('src/main')
+    inputs.property('mc', project.minecraft_version)
+    outputs.dir(ppRoot)
+    doLast {
+        delete(ppRoot)
+        def base = file('src/main')
+        fileTree(base).visit { d ->
+            if (d.isDirectory()) return
+            def rel = d.relativePath.pathString
+            def dest = new File(ppRoot, rel)
+            dest.parentFile.mkdirs()
+            if (rel.endsWith('.java') || rel.endsWith('.json')) {
+                dest.setText(processText(d.file.getText('UTF-8'), rel), 'UTF-8')
+            } else {
+                dest.bytes = d.file.bytes
+            }
+        }
+    }
+}
+sourceSets.main.java.srcDirs = [new File(ppRoot, 'java')]
+sourceSets.main.resources.srcDirs = [new File(ppRoot, 'resources')]
+tasks.named('compileJava') { dependsOn 'preprocess' }
+tasks.named('processResources') { dependsOn 'preprocess' }
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    // 26.x is not obfuscated: no mappings line, plain implementation instead of modImplementation.
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+}
+
+processResources {
+    inputs.property "version", project.version
+    inputs.property "minecraft_version", project.minecraft_version
+    inputs.property "java_version", javaVer
+    inputs.property "strict", strictMixins
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version, "minecraft_version": project.minecraft_version, "java_version": javaVer
+    }
+    filesMatching("novaclient.mixins.json") {
+        expand "java_level": "JAVA_${javaVer}", "mixin_required": strictMixins.toString(), "mixin_require": strictMixins ? 1 : 0
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = javaVer
+    it.options.encoding = 'UTF-8'
+    it.options.compilerArgs.addAll(['-Xmaxerrs', '1000'])   // show every error at once, not just the first 100
+}
+
+java {
+    sourceCompatibility = JavaVersion.toVersion(javaVer)
+    targetCompatibility = JavaVersion.toVersion(javaVer)
+}

@@ -15,6 +15,6 @@ public class ThemeModule extends Module {
     @Override public String category() { return "Visual"; }
     @Override public boolean persistent() { return false; }
 
-    @Override public void onTick(net.minecraft.client.Minecraft mc) { Theme.apply((int) palette.get()); }
+    @Override public void onTick(net.minecraft.client.MinecraftClient mc) { Theme.apply((int) palette.get()); }
     @Override protected void onDisable() { Theme.apply(0); }
 }

@@ -2,10 +2,10 @@ package com.nova.client.account;
 
 import com.nova.client.compat.Mc;
 import com.nova.client.util.S;
-import net.minecraft.client.Minecraft;
 import com.nova.client.config.Config;
 import com.nova.client.gui.Toasts;
 import com.nova.client.gui.Ui;
+import net.minecraft.client.MinecraftClient;
 
 
 /** Holds the current login state and swaps the game's Session after login. */
@@ -75,7 +75,7 @@ public final class AccountManager {
             Config.save();
         }
         MicrosoftAuth.McProfile p = MicrosoftAuth.loginMinecraft(tok.accessToken());
-        Minecraft mc = Minecraft.getInstance();
+        MinecraftClient mc = MinecraftClient.getInstance();
         mc.execute(() -> {
             if (original == null) original = Mc.currentSession(mc);
             Mc.setSession(mc, Mc.newSession(p.name(), p.uuid(), p.mcToken()));
@@ -89,7 +89,7 @@ public final class AccountManager {
         Config.get().refreshToken = "";
         Config.save();
         mcToken = null;
-        Minecraft mc = Minecraft.getInstance();
+        MinecraftClient mc = MinecraftClient.getInstance();
         mc.execute(() -> {
             if (original != null) Mc.setSession(mc, original);
         });

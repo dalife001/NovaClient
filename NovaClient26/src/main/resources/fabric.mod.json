@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "novaclient",
+  "version": "${version}",
+  "name": "Nova Client",
+  "description": "Custom Minecraft client: main menu, accounts, skins, friends, HUD modules, zoom and more. Sodium, Iris and Freecam are optional and chosen in the Nova Launcher.",
+  "environment": "client",
+  "entrypoints": { "client": ["com.nova.client.NovaClient"] },
+  "mixins": ["novaclient.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "${minecraft_version}",
+    "java": ">=${java_version}",
+    "fabric-lifecycle-events-v1": "*",
+    "fabric-key-binding-api-v1": "*",
+    "fabric-rendering-v1": "*",
+    "fabric-events-interaction-v0": "*"
+  }
+}

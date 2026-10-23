@@ -18,7 +18,6 @@ final class VersionDialog extends JDialog {
                   String embeddedMc, Consumer<String> onPick) {
         super(owner, "Minecraft version", true);
         List<Item> all = new ArrayList<>();
-        all.add(new Item("", "Automatic", "newest Nova build"));
         for (String v : versions) all.add(new Item(v, v, tagFor(v, builds, embeddedMc)));
 
         JPanel p = new JPanel(new BorderLayout(0, 12));

@@ -1,5 +1,5 @@
 plugins {
-    id 'net.fabricmc.fabric-loom'
+    id 'fabric-loom'
 }
 
 version = project.mod_version
@@ -7,8 +7,7 @@ group = 'com.nova'
 base { archivesName = 'novaclient' }
 
 // ---------------------------------------------------------------------------------------------------------
-// Nova Client for Minecraft 26.x (unobfuscated: Mojang names, no mappings, no remapping, Java 25).
-// Same idea as the main project: one source tree, //#if MC >= 26200 style branches when 26.1 / 26.2 / 26.3 differ.
+// One source tree, every Minecraft version.
 //
 // The release pipeline passes the Minecraft version with -P (see .github/workflows/release.yml).
 // Version specific code lives in the SAME file, between marker comments:
@@ -21,20 +20,20 @@ base { archivesName = 'novaclient' }
 //     ...code for everything older...
 //     //#endif
 //
-// MC here is major*10000 + minor*100 + patch: 26.1 = 26100, 26.1.2 = 26102, 26.2 = 26200, 26.3 = 26300.
+// MC is the Minecraft version as minor*100+patch: 1.16.5 = 1605, 1.20 = 2000, 1.21.4 = 2104.
 // The task `preprocess` below keeps the matching branch and writes the result to build/pp, which is
 // what actually gets compiled. Nothing in src/ is ever changed.
 // ---------------------------------------------------------------------------------------------------------
 def mcNumber = { String v ->
     def p = v.tokenize('.')
-    return (p[0] as int) * 10000 + (p[1] as int) * 100 + (p.size() > 2 ? (p[2] as int) : 0)
+    return (p[1] as int) * 100 + (p.size() > 2 ? (p[2] as int) : 0)
 }
 final int MC = mcNumber(project.minecraft_version as String)
 
-// java_version : Java level the jar targets (26.x needs 25)
+// java_version : Java level the jar targets (8 for 1.16, 16 for 1.17, 17 for 1.18-1.20.4, 21 for 1.20.5+)
 // strict_mixins: true = a mixin that no longer fits stops the game (good for tested versions),
 //                false = it is skipped with a warning (used for untested versions so the game still starts)
-def javaVer      = (project.findProperty('java_version') ?: '25') as int
+def javaVer      = (project.findProperty('java_version') ?: (MC >= 2005 ? '21' : MC >= 1800 ? '17' : MC >= 1700 ? '16' : '8')) as int
 def strictMixins = (project.findProperty('strict_mixins') ?: 'true') != 'false'
 
 def evalAtom = { String atom ->
@@ -112,9 +111,11 @@ tasks.named('processResources') { dependsOn 'preprocess' }
 
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    // 26.x is not obfuscated: no mappings line, plain implementation instead of modImplementation.
-    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    // Sodium, Iris and Freecam are NOT part of Nova Client any more. The launcher lets the player pick them
+    // (and downloads the right build for the chosen Minecraft version), so nothing is bundled here.
 }
 
 processResources {
@@ -130,11 +131,7 @@ processResources {
     }
 }
 
-tasks.withType(JavaCompile).configureEach {
-    it.options.release = javaVer
-    it.options.encoding = 'UTF-8'
-    it.options.compilerArgs.addAll(['-Xmaxerrs', '1000'])   // show every error at once, not just the first 100
-}
+tasks.withType(JavaCompile).configureEach { it.options.release = javaVer; it.options.encoding = 'UTF-8' }
 
 java {
     sourceCompatibility = JavaVersion.toVersion(javaVer)

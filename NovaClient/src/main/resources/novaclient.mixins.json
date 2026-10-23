@@ -7,7 +7,9 @@
     "GameRendererMixin",
     "InGameHudMixin",
     "InGameOverlayRendererMixin"
+    //#if MC >= 1900
     ,"SimpleOptionAccessor"
+    //#endif
   ],
   "injectors": { "defaultRequire": ${mixin_require} }
 }
