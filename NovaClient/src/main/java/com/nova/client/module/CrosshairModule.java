@@ -3,7 +3,7 @@ package com.nova.client.module;
 import com.nova.client.compat.Mc;
 import com.nova.client.gui.Gfx;
 import com.nova.client.gui.Ui;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 /** A fully custom crosshair. Replaces the vanilla one while enabled. */
 public class CrosshairModule extends Module {
@@ -32,9 +32,9 @@ public class CrosshairModule extends Module {
     }
 
     @Override
-    public void onRender(Gfx ctx, MinecraftClient mc) {
-        if (mc.options.hudHidden || !Mc.firstPerson(mc)) return;
-        int cx = mc.getWindow().getScaledWidth() / 2, cy = mc.getWindow().getScaledHeight() / 2;
+    public void onRender(Gfx ctx, Minecraft mc) {
+        if (mc.options.hideGui || !Mc.firstPerson(mc)) return;
+        int cx = mc.getWindow().getGuiScaledWidth() / 2, cy = mc.getWindow().getGuiScaledHeight() / 2;
         int s = (int) size.get(), g = (int) gap.get(), t = (int) thickness.get();
         int c = argb(), o = 0xB0000000;
         int lo = t / 2, hi = t - lo;

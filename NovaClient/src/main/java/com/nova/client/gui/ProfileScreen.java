@@ -5,11 +5,10 @@ import com.nova.client.NovaClient;
 import com.nova.client.PlayStats;
 import com.nova.client.config.Config;
 import com.nova.client.friends.FriendsManager;
-import net.minecraft.client.gui.screen.Screen;
-
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import net.minecraft.client.gui.screens.Screen;
 
 /** Your player card: skin, level, playtime and quick links. */
 public class ProfileScreen extends NovaScreen {
@@ -26,9 +25,9 @@ public class ProfileScreen extends NovaScreen {
         int rx = px + 172, rw = pw - 172 - 16;
         int bw = (rw - 12) / 3;
         int by = py + ph - 34;
-        button(rx, by, bw, 20, "Skins", true, () -> Mc.setScreen(client, new SkinScreen(this)));
-        button(rx + bw + 6, by, bw, 20, "Account", false, () -> Mc.setScreen(client, new AccountScreen(this)));
-        button(rx + 2 * (bw + 6), by, bw, 20, "Friends", false, () -> Mc.setScreen(client, new FriendsScreen(this)));
+        button(rx, by, bw, 20, "Skins", true, () -> Mc.setScreen(minecraft, new SkinScreen(this)));
+        button(rx + bw + 6, by, bw, 20, "Account", false, () -> Mc.setScreen(minecraft, new AccountScreen(this)));
+        button(rx + 2 * (bw + 6), by, bw, 20, "Friends", false, () -> Mc.setScreen(minecraft, new FriendsScreen(this)));
         button(px + 12, py + ph - 26, 60, 16, "< Back", AnimButton.Style.GHOST, this::nClose);
     }
 
@@ -46,8 +45,8 @@ public class ProfileScreen extends NovaScreen {
     protected void drawFront(Gfx ctx, int mx, int my, float delta) {
         SkinCache.ensure();
         float t = age();
-        String name = client.getSession().getUsername();
-        boolean online = Mc.online(client);
+        String name = minecraft.getUser().getName();
+        boolean online = Mc.online(minecraft);
 
         // ---- left: figure on a glowing platform ----
         float eF = Anim.stagger(t, 0.1f, 0.6f);
@@ -65,32 +64,32 @@ public class ProfileScreen extends NovaScreen {
         if (!SkinCache.drawBody(ctx, fx, fy, scale, eF)) {
             int s = Math.min(64, fw);
             SkinCache.drawHead(ctx, px + 8 + (154 - s) / 2, py + 40, s, eF);
-            Ui.centered(ctx, textRenderer, online ? "Loading skin..." : "Offline mode", px + 85, py + 40 + s + 8, Ui.MUTED, eF);
+            Ui.centered(ctx, font, online ? "Loading skin..." : "Offline mode", px + 85, py + 40 + s + 8, Ui.MUTED, eF);
         }
-        Ui.centered(ctx, textRenderer, name, px + 85, py + ph - 52, Ui.TEXT, eF);
+        Ui.centered(ctx, font, name, px + 85, py + ph - 52, Ui.TEXT, eF);
 
         // ---- right: name + level ----
         int rx = px + 172, rw = pw - 172 - 16;
         float e1 = Anim.stagger(t, 0.15f, 0.5f);
-        Ui.big(ctx, textRenderer, name, rx + textRenderer.getWidth(name), py + 16 - (int) ((1f - e1) * 8), 2f, Ui.TEXT, e1);
+        Ui.big(ctx, font, name, rx + font.width(name), py + 16 - (int) ((1f - e1) * 8), 2f, Ui.TEXT, e1);
         // (big() centres; the shift above keeps it left aligned)
 
         String badge = online ? "Microsoft account" : "Offline mode";
-        int bw = textRenderer.getWidth(badge) + 12;
+        int bw = font.width(badge) + 12;
         Ui.rrect(ctx, rx, py + 38, bw, 12, 6, Ui.a(online ? 0xFF0F3A30 : 0xFF3B2F12, e1));
-        Ui.text(ctx, textRenderer, badge, rx + 6, py + 40, online ? Ui.GREEN : Ui.AMBER, e1);
+        Ui.text(ctx, font, badge, rx + 6, py + 40, online ? Ui.GREEN : Ui.AMBER, e1);
         long since = Config.get().firstLaunch;
         if (since > 0) {
             String m = "Member since " + Instant.ofEpochMilli(since).atZone(ZoneId.systemDefault()).toLocalDate();
-            Ui.text(ctx, textRenderer, m, rx + bw + 8, py + 40, Ui.MUTED, e1);
+            Ui.text(ctx, font, m, rx + bw + 8, py + 40, Ui.MUTED, e1);
         }
 
         // level bar
         float e2 = Anim.stagger(t, 0.25f, 0.5f);
         int ly = py + 60;
-        Ui.text(ctx, textRenderer, "LEVEL " + PlayStats.level(), rx, ly, Ui.ACCENT, e2);
+        Ui.text(ctx, font, "LEVEL " + PlayStats.level(), rx, ly, Ui.ACCENT, e2);
         String next = PlayStats.minutesToNext() + " min to next level";
-        Ui.text(ctx, textRenderer, next, rx + rw - textRenderer.getWidth(next), ly, Ui.MUTED, e2);
+        Ui.text(ctx, font, next, rx + rw - font.width(next), ly, Ui.MUTED, e2);
         float fill = PlayStats.progress() * Anim.easeOutCubic((t - 0.5f) / 1.2f); // bar fills in slowly
         Ui.bar(ctx, rx, ly + 12, rw, 8, fill, e2);
 
@@ -109,8 +108,8 @@ public class ProfileScreen extends NovaScreen {
             Ui.rrect(ctx, x, y, cw, ch, 7, Ui.glass((hov ? 0.10f : 0.06f) * e));
             Ui.rim(ctx, x, y, cw, ch, 7, Ui.a(hov ? Ui.a(Ui.ACCENT, 0.7f) : Ui.glass(0.12f), e));
             Ui.rrect(ctx, x + 4, y + 9, 2, ch - 18, 1, Ui.a(Ui.ACCENT, e));
-            Ui.text(ctx, textRenderer, stats[i][0], x + 10, y + 8, Ui.MUTED, e);
-            Ui.big(ctx, textRenderer, stats[i][1], x + 10 + textRenderer.getWidth(stats[i][1]) * 3 / 4, y + 22, 1.5f, Ui.TEXT, e);
+            Ui.text(ctx, font, stats[i][0], x + 10, y + 8, Ui.MUTED, e);
+            Ui.big(ctx, font, stats[i][1], x + 10 + font.width(stats[i][1]) * 3 / 4, y + 22, 1.5f, Ui.TEXT, e);
         }
     }
 }

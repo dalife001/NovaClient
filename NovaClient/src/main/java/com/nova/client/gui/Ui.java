@@ -1,7 +1,7 @@
 package com.nova.client.gui;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 
 /**
  * Shared colours and drawing helpers so every screen feels the same: soft, rounded, calm.
@@ -39,27 +39,27 @@ public final class Ui {
     public static int glass(float alpha) { return ((int) (Anim.clamp01(alpha) * 255f) << 24) | 0xFFFFFF; }
 
     /** Draws text with an alpha; skips it when nearly invisible (Minecraft treats tiny alpha as opaque!). */
-    public static void text(Gfx c, TextRenderer tr, String s, int x, int y, int color, float alpha) {
+    public static void text(Gfx c, Font tr, String s, int x, int y, int color, float alpha) {
         int col = a(color, alpha);
         if ((col >>> 24) < 12) return;
         c.drawTextWithShadow(tr, s, x, y, col);
     }
 
-    public static void centered(Gfx c, TextRenderer tr, String s, int cx, int y, int color, float alpha) {
-        text(c, tr, s, cx - tr.getWidth(s) / 2, y, color, alpha);
+    public static void centered(Gfx c, Font tr, String s, int cx, int y, int color, float alpha) {
+        text(c, tr, s, cx - tr.width(s) / 2, y, color, alpha);
     }
 
     /** Text drawn at a larger size around centre x. */
-    public static void big(Gfx c, TextRenderer tr, String s, int cx, int y, float scale, int color, float alpha) {
+    public static void big(Gfx c, Font tr, String s, int cx, int y, float scale, int color, float alpha) {
         c.push();
-        c.translate((float) (cx - tr.getWidth(s) * scale / 2f), (float) (y));
+        c.translate((float) (cx - tr.width(s) * scale / 2f), (float) (y));
         c.scale(scale, scale);
         text(c, tr, s, 0, 0, color, alpha);
         c.pop();
     }
 
     /** Left-aligned text at a larger size. */
-    public static void scaled(Gfx c, TextRenderer tr, String s, float x, float y, float scale, int color, float alpha) {
+    public static void scaled(Gfx c, Font tr, String s, float x, float y, float scale, int color, float alpha) {
         c.push();
         c.translate((float) (x), (float) (y));
         c.scale(scale, scale);
@@ -68,9 +68,9 @@ public final class Ui {
     }
 
     /** Letters that slowly drift between the two palette colours, centred on cx. */
-    public static void shimmer(Gfx c, TextRenderer tr, String s, int cx, int y, float scale, float alpha) {
+    public static void shimmer(Gfx c, Font tr, String s, int cx, int y, float scale, float alpha) {
         int total = 0;
-        for (int i = 0; i < s.length(); i++) total += tr.getWidth(String.valueOf(s.charAt(i)));
+        for (int i = 0; i < s.length(); i++) total += tr.width(String.valueOf(s.charAt(i)));
         flow(c, tr, s, cx - total * scale / 2f, y, scale, 0, alpha, false);
     }
 
@@ -78,7 +78,7 @@ public final class Ui {
      * Left-aligned, letter-spaced text whose colour flows slowly through the palette.
      * With `bob` each letter also floats up and down very gently.
      */
-    public static void flow(Gfx c, TextRenderer tr, String s, float x, float y, float scale, float spacing, float alpha, boolean bob) {
+    public static void flow(Gfx c, Font tr, String s, float x, float y, float scale, float spacing, float alpha, boolean bob) {
         float t = Anim.seconds();
         float cx = x;
         for (int i = 0; i < s.length(); i++) {
@@ -86,14 +86,14 @@ public final class Ui {
             float k = 0.5f + 0.5f * (float) Math.sin(t * 0.8f - i * 0.9f);
             float dy = bob ? (float) Math.sin(t * 0.9f + i * 0.8f) * scale * 0.35f : 0f;
             scaled(c, tr, ch, cx, y + dy, scale, Anim.lerpColor(Theme.light(ACCENT), Theme.light(CYAN), k), alpha);
-            cx += (tr.getWidth(ch) + spacing) * scale;
+            cx += (tr.width(ch) + spacing) * scale;
         }
     }
 
     /** Width of letter-spaced text (matches flow()). */
-    public static float flowWidth(TextRenderer tr, String s, float scale, float spacing) {
+    public static float flowWidth(Font tr, String s, float scale, float spacing) {
         float w = 0;
-        for (int i = 0; i < s.length(); i++) w += (tr.getWidth(String.valueOf(s.charAt(i))) + spacing) * scale;
+        for (int i = 0; i < s.length(); i++) w += (tr.width(String.valueOf(s.charAt(i))) + spacing) * scale;
         return w;
     }
 
@@ -244,15 +244,15 @@ public final class Ui {
     // ---------- backgrounds ----------
     /** Mouse position relative to the window centre, -0.5..0.5 (for parallax). */
     public static float parallaxX() {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.getWindow().getWidth() <= 0) return 0;
-        return Math.max(-0.5f, Math.min(0.5f, (float) (mc.mouse.getX() / mc.getWindow().getWidth()) - 0.5f));
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.getWindow().getScreenWidth() <= 0) return 0;
+        return Math.max(-0.5f, Math.min(0.5f, (float) (mc.mouseHandler.xpos() / mc.getWindow().getScreenWidth()) - 0.5f));
     }
 
     public static float parallaxY() {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.getWindow().getHeight() <= 0) return 0;
-        return Math.max(-0.5f, Math.min(0.5f, (float) (mc.mouse.getY() / mc.getWindow().getHeight()) - 0.5f));
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.getWindow().getScreenHeight() <= 0) return 0;
+        return Math.max(-0.5f, Math.min(0.5f, (float) (mc.mouseHandler.ypos() / mc.getWindow().getScreenHeight()) - 0.5f));
     }
 
     /** The living night sky (or your own wallpaper with soft stars on top). */

@@ -1,10 +1,9 @@
 package com.nova.client.gui;
 
-import net.minecraft.client.font.TextRenderer;
-
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import net.minecraft.client.gui.Font;
 
 /** Little notifications that slide in from the right. Safe to call from any thread. */
 public final class Toasts {
@@ -28,7 +27,7 @@ public final class Toasts {
         }
     }
 
-    public static void render(Gfx c, TextRenderer tr, int w, int h) {
+    public static void render(Gfx c, Font tr, int w, int h) {
         long now = System.currentTimeMillis();
         synchronized (LIST) {
             int y = 30;
@@ -39,7 +38,7 @@ public final class Toasts {
                 float in = Anim.easeOutCubic(age / (float) IN);
                 float fade = Anim.clamp01(age / 200f);
                 float out = (age > LIFE - OUT ? 1f - (age - (LIFE - OUT)) / (float) OUT : 1f) * fade;
-                int tw = Math.max(120, Math.max(tr.getWidth(t.title), tr.getWidth(t.msg)) + 28);
+                int tw = Math.max(120, Math.max(tr.width(t.title), tr.width(t.msg)) + 28);
                 int x = (w - tw) / 2;
                 int yy = y - (int) ((1f - Math.min(1f, in)) * 26); // drops in from above
                 Ui.panel(c, x, yy, tw, 28, 9, 0xF0100D26, out);

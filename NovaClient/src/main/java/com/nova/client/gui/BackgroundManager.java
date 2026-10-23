@@ -1,13 +1,12 @@
 package com.nova.client.gui;
 
+import com.mojang.blaze3d.platform.NativeImage;
 import com.nova.client.config.Config;
 import com.nova.client.util.S;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.util.Identifier;
-
 import javax.imageio.ImageIO;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.resources.Identifier;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -21,11 +20,7 @@ import java.nio.file.Paths;
  */
 public final class BackgroundManager {
     private static Identifier id() {
-        //#if MC >= 1900
-        return Identifier.of("novaclient", "custom_background");
-        //#else
-        return new Identifier("novaclient", "custom_background");
-        //#endif
+        return Identifier.fromNamespaceAndPath("novaclient", "custom_background");
     }
 
     private static final Identifier ID = id();
@@ -69,11 +64,7 @@ public final class BackgroundManager {
             NativeImage ni = NativeImage.read(new ByteArrayInputStream(png.toByteArray()));
             iw = ni.getWidth();
             ih = ni.getHeight();
-            //#if MC >= 2105
-            MinecraftClient.getInstance().getTextureManager().registerTexture(ID, new NativeImageBackedTexture(() -> "novaclient_background", ni));
-            //#else
-            MinecraftClient.getInstance().getTextureManager().registerTexture(ID, new NativeImageBackedTexture(ni));
-            //#endif
+            Minecraft.getInstance().getTextureManager().register(ID, new DynamicTexture(() -> "novaclient_background", ni));
             ok = true;
         } catch (Exception e) {
             e.printStackTrace();

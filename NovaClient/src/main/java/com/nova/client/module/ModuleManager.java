@@ -2,11 +2,10 @@ package com.nova.client.module;
 
 import com.nova.client.gui.Gfx;
 import com.nova.client.config.Config;
-import net.minecraft.client.MinecraftClient;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import net.minecraft.client.Minecraft;
 
 public class ModuleManager {
     private final List<Module> modules = new ArrayList<>();
@@ -80,11 +79,11 @@ public class ModuleManager {
         Config.save();
     }
 
-    public void onTick(MinecraftClient mc) {
+    public void onTick(Minecraft mc) {
         for (Module m : modules) if (m.isEnabled()) m.onTick(mc);
     }
 
-    public void onRender(Gfx ctx, MinecraftClient mc) {
+    public void onRender(Gfx ctx, Minecraft mc) {
         for (Module m : modules) if (m.isEnabled()) m.onRender(ctx, mc);
     }
 }

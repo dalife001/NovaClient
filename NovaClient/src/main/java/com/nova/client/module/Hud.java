@@ -3,7 +3,7 @@ package com.nova.client.module;
 import com.nova.client.gui.Gfx;
 import com.nova.client.gui.Anim;
 import com.nova.client.gui.Ui;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 /** Shared look for every HUD element: soft frosted glass with a thin glowing line along the top edge. */
 public final class Hud {
@@ -25,12 +25,12 @@ public final class Hud {
     }
 
     /** Panel with a small title on top (content starts at y + TITLE_H). */
-    public static void titled(Gfx c, MinecraftClient mc, int x, int y, int w, int h, String title) {
+    public static void titled(Gfx c, Minecraft mc, int x, int y, int w, int h, String title) {
         glass(c, x, y, w, h);
-        c.drawTextWithShadow(mc.textRenderer, title, x + 6, y + 3, Anim.lerpColor(Ui.ACCENT, 0xFFFFFFFF, 0.55f));
+        c.drawTextWithShadow(mc.font, title, x + 6, y + 3, Anim.lerpColor(Ui.ACCENT, 0xFFFFFFFF, 0.55f));
         c.fill(x + 5, y + TITLE_H - 1, x + w - 5, y + TITLE_H, Ui.glass(0.10f));
     }
 
     /** Width a titled panel needs so its title always fits. */
-    public static int titleWidth(MinecraftClient mc, String title) { return mc.textRenderer.getWidth(title) + 14; }
+    public static int titleWidth(Minecraft mc, String title) { return mc.font.width(title) + 14; }
 }

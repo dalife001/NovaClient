@@ -5,8 +5,7 @@ pluginManagement {
         gradlePluginPortal()
     }
     plugins {
-        // Newer Minecraft versions need a newer Loom. The release pipeline passes -Ploom_version for each version;
-        // building by hand without it uses the one that is known to work for the default 1.21.4.
-        id 'fabric-loom' version (settings.providers.gradleProperty('loom_version').getOrElse('1.9-SNAPSHOT'))
+        // 26.1.x: Loom 1.16, 26.2 and newer: Loom 1.17. The pipeline passes -Ploom_version.
+        id 'net.fabricmc.fabric-loom' version (settings.providers.gradleProperty('loom_version').getOrElse('1.16-SNAPSHOT'))
     }
 }

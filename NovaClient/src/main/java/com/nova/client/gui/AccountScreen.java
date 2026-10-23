@@ -4,9 +4,8 @@ import com.nova.client.util.S;
 import com.nova.client.account.AccountManager;
 import com.nova.client.compat.Mc;
 import com.nova.client.config.Config;
-import net.minecraft.client.gui.screen.Screen;
-
 import java.net.URI;
+import net.minecraft.client.gui.screens.Screen;
 
 public class AccountScreen extends NovaScreen {
     private static final int W = 300;
@@ -28,7 +27,7 @@ public class AccountScreen extends NovaScreen {
         }
         int half = (w - 5) / 2;
         button(x, y + 27, half, 22, "Copy code", false, () -> {
-            if (AccountManager.userCode != null) Mc.clipboard(client, AccountManager.userCode);
+            if (AccountManager.userCode != null) Mc.clipboard(minecraft, AccountManager.userCode);
         });
         button(x + half + 5, y + 27, half, 22, "Open login page", false, () -> {
             String u = AccountManager.verifyUri != null ? AccountManager.verifyUri : "https://www.microsoft.com/link";
@@ -46,25 +45,25 @@ public class AccountScreen extends NovaScreen {
     @Override
     protected void drawFront(Gfx ctx, int mx, int my, float delta) {
         int cx = width / 2;
-        ctx.drawCenteredTextWithShadow(textRenderer, "Account", cx, py() + 9, Ui.TEXT);
-        ctx.drawCenteredTextWithShadow(textRenderer, "Playing as", cx, py() + 38, Ui.MUTED);
-        ctx.drawCenteredTextWithShadow(textRenderer, client.getSession().getUsername(), cx, py() + 50, Ui.TEXT);
+        ctx.drawCenteredTextWithShadow(font, "Account", cx, py() + 9, Ui.TEXT);
+        ctx.drawCenteredTextWithShadow(font, "Playing as", cx, py() + 38, Ui.MUTED);
+        ctx.drawCenteredTextWithShadow(font, minecraft.getUser().getName(), cx, py() + 50, Ui.TEXT);
 
         String code = AccountManager.userCode;
         if (code != null) {
             ctx.push();
             ctx.translate((float) (cx), (float) (py() + 68));
             ctx.scale(2.5f, 2.5f);
-            ctx.drawCenteredTextWithShadow(textRenderer, code, 0, 0, Ui.CYAN);
+            ctx.drawCenteredTextWithShadow(font, code, 0, 0, Ui.CYAN);
             ctx.pop();
         }
         String status = AccountManager.status;
         int color = status.startsWith("Login failed") || status.startsWith("Put your") ? Ui.RED
                 : AccountManager.isLoggedIn() ? Ui.GREEN : Ui.MUTED;
-        ctx.drawCenteredTextWithShadow(textRenderer, textRenderer.trimToWidth(status, W - 20), cx, py() + 98, color);
+        ctx.drawCenteredTextWithShadow(font, font.plainSubstrByWidth(status, W - 20), cx, py() + 98, color);
 
         if (S.blank(Config.get().azureClientId)) {
-            ctx.drawCenteredTextWithShadow(textRenderer, "Set azureClientId in config/novaclient.json", cx, py() + 178, Ui.MUTED);
+            ctx.drawCenteredTextWithShadow(font, "Set azureClientId in config/novaclient.json", cx, py() + 178, Ui.MUTED);
         }
     }
 

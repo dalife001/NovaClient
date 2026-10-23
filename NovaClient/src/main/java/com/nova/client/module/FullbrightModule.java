@@ -1,10 +1,8 @@
 package com.nova.client.module;
 
-import net.minecraft.client.MinecraftClient;
-//#if MC >= 1900
 import com.nova.client.mixin.SimpleOptionAccessor;
-import net.minecraft.client.option.SimpleOption;
-//#endif
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.OptionInstance;
 
 /** Maximum brightness everywhere: no more dark caves. Puts your old brightness back when turned off. */
 public class FullbrightModule extends Module {
@@ -15,26 +13,18 @@ public class FullbrightModule extends Module {
 
     @Override public String category() { return "Visual"; }
 
-    private static double gamma(MinecraftClient mc) {
-        //#if MC >= 1900
-        return mc.options.getGamma().getValue();
-        //#else
-        return mc.options.gamma;
-        //#endif
+    private static double gamma(Minecraft mc) {
+        return mc.options.gamma().get();
     }
 
     @SuppressWarnings("unchecked")
-    private void set(MinecraftClient mc, double v) {
-        //#if MC >= 1900
-        SimpleOption<Double> gamma = mc.options.getGamma();
+    private void set(Minecraft mc, double v) {
+        OptionInstance<Double> gamma = mc.options.gamma();
         ((SimpleOptionAccessor<Double>) (Object) gamma).novaSetRawValue(v);
-        //#else
-        mc.options.gamma = v;
-        //#endif
     }
 
     @Override
-    public void onTick(MinecraftClient mc) {
+    public void onTick(Minecraft mc) {
         if (mc.options == null) return;
         double now = gamma(mc);
         if (saved == null && now <= 1.0) saved = now;
@@ -45,7 +35,7 @@ public class FullbrightModule extends Module {
 
     /** Restores the brightness the player had before. Also called when the game closes. */
     public void release() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc == null || mc.options == null) return;
         if (gamma(mc) > 1.0) set(mc, saved != null ? saved : 1.0);
         saved = null;

@@ -1,7 +1,7 @@
 package com.nova.client.module;
 
 import com.nova.client.NovaClient;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 /** Hold the zoom key (C by default) to zoom in with smooth camera. */
 public class ZoomModule extends Module {
@@ -18,21 +18,21 @@ public class ZoomModule extends Module {
     @Override public String category() { return "Camera"; }
 
     public boolean isZooming() {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        return isEnabled() && NovaClient.zoomKey != null && NovaClient.zoomKey.isPressed() && mc.currentScreen == null;
+        Minecraft mc = Minecraft.getInstance();
+        return isEnabled() && NovaClient.zoomKey != null && NovaClient.zoomKey.isDown() && mc.screen == null;
     }
 
     /** Multiplier applied to the field of view. */
     public double factor() { return 1.0 / level.get(); }
 
     @Override
-    public void onTick(MinecraftClient mc) {
+    public void onTick(Minecraft mc) {
         boolean z = isZooming();
         if (z && !wasZooming) {
-            previousSmooth = mc.options.smoothCameraEnabled;
-            mc.options.smoothCameraEnabled = true;
+            previousSmooth = mc.options.smoothCamera;
+            mc.options.smoothCamera = true;
         } else if (!z && wasZooming) {
-            mc.options.smoothCameraEnabled = previousSmooth;
+            mc.options.smoothCamera = previousSmooth;
         }
         wasZooming = z;
     }
@@ -40,7 +40,7 @@ public class ZoomModule extends Module {
     @Override
     protected void onDisable() {
         if (wasZooming) {
-            MinecraftClient.getInstance().options.smoothCameraEnabled = previousSmooth;
+            Minecraft.getInstance().options.smoothCamera = previousSmooth;
             wasZooming = false;
         }
     }

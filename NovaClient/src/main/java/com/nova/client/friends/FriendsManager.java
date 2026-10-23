@@ -4,12 +4,11 @@ import com.google.gson.JsonObject;
 import com.nova.client.account.MicrosoftAuth;
 import com.nova.client.config.Config;
 import com.nova.client.util.Net;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayNetworkHandler;
-import net.minecraft.client.network.PlayerListEntry;
-
 import java.util.List;
 import java.util.function.Consumer;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.client.multiplayer.PlayerInfo;
 
 /** Local friends list (saved in the config). Names are verified against Mojang. */
 public final class FriendsManager {
@@ -19,7 +18,7 @@ public final class FriendsManager {
 
     /** Looks the player up on Mojang, then adds them. Callback runs on the game thread. */
     public static void add(String name, Consumer<String> result) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         String trimmed = name == null ? "" : name.trim();
         if (!trimmed.matches("[A-Za-z0-9_]{3,16}")) {
             result.accept("Not a valid Minecraft username");
@@ -57,14 +56,10 @@ public final class FriendsManager {
 
     /** True if the friend is in the server/world you are currently in. */
     public static boolean isHere(Config.Friend f) {
-        ClientPlayNetworkHandler h = MinecraftClient.getInstance().getNetworkHandler();
+        ClientPacketListener h = Minecraft.getInstance().getConnection();
         if (h == null) return false;
-        for (PlayerListEntry e : h.getPlayerList()) {
-            //#if MC >= 2109
+        for (PlayerInfo e : h.getOnlinePlayers()) {
             String playerName = e.getProfile().name();
-            //#else
-            String playerName = e.getProfile().getName();
-            //#endif
             if (playerName.equalsIgnoreCase(f.name)) return true;
         }
         return false;

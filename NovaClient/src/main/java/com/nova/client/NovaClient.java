@@ -12,13 +12,13 @@ import com.nova.client.gui.NovaTitleScreen;
 import com.nova.client.module.ModuleManager;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.TitleScreen;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.TitleScreen;
-import net.minecraft.client.option.KeyBinding;
 import org.lwjgl.glfw.GLFW;
 
 public class NovaClient implements ClientModInitializer {
@@ -27,8 +27,8 @@ public class NovaClient implements ClientModInitializer {
     private static boolean updateToasted;
     public static ModuleManager modules;
 
-    private static KeyBinding openGuiKey;
-    public static KeyBinding zoomKey;
+    private static KeyMapping openGuiKey;
+    public static KeyMapping zoomKey;
 
     @Override
     public void onInitializeClient() {
@@ -45,11 +45,11 @@ public class NovaClient implements ClientModInitializer {
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> modules.fullbright.release());
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (client.currentScreen instanceof TitleScreen) {
+            if (client.screen instanceof TitleScreen) {
                 Mc.setScreen(client, new NovaTitleScreen());
             }
-            while (openGuiKey.wasPressed()) {
-                if (client.currentScreen == null) Mc.setScreen(client, new ClickGuiScreen(null));
+            while (openGuiKey.consumeClick()) {
+                if (client.screen == null) Mc.setScreen(client, new ClickGuiScreen(null));
             }
             PlayStats.tick(client);
             if (!updateToasted && UpdateChecker.available()) {
@@ -59,25 +59,19 @@ public class NovaClient implements ClientModInitializer {
             modules.onTick(client);
         });
 
-        //#if MC >= 2100
         HudRenderCallback.EVENT.register((context, tickCounter) -> renderHud(new Gfx(context)));
-        //#elseif MC >= 2000
-        HudRenderCallback.EVENT.register((context, tickDelta) -> renderHud(new Gfx(context)));
-        //#else
-        HudRenderCallback.EVENT.register((matrices, tickDelta) -> renderHud(new Gfx(matrices)));
-        //#endif
 
         AccountManager.tryAutoLogin();
         UpdateChecker.checkOnce();
     }
 
     private static void renderHud(Gfx context) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.player != null && !mc.options.hudHidden && !(mc.currentScreen instanceof HudEditorScreen)) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player != null && !mc.options.hideGui && !(mc.screen instanceof HudEditorScreen)) {
             modules.onRender(context, mc);
         }
-        if (mc.currentScreen == null) {
-            Toasts.render(context, mc.textRenderer, mc.getWindow().getScaledWidth(), mc.getWindow().getScaledHeight());
+        if (mc.screen == null) {
+            Toasts.render(context, mc.font, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
         }
     }
 }
