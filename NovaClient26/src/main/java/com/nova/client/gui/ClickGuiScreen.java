@@ -5,7 +5,7 @@ import com.nova.client.NovaClient;
 import com.nova.client.module.HudModule;
 import com.nova.client.module.Module;
 import com.nova.client.module.NumberSetting;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -311,7 +311,7 @@ public class ClickGuiScreen extends NovaScreen {
 
     @Override
     protected boolean nKey(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == GLFW.GLFW_KEY_RIGHT_SHIFT && !field.isFocused()) { nClose(); return true; }
+        if (keyCode == InputConstants.KEY_RSHIFT && !field.isFocused()) { nClose(); return true; }
         return super.nKey(keyCode, scanCode, modifiers);
     }
 

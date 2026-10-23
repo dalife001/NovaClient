@@ -31,13 +31,71 @@ public final class Mc {
     }
 
     public static void setScreen(Minecraft c, Screen s) {
+        //#if MC >= 26200
+        c.setScreenAndShow(s);
+        //#else
         c.setScreen(s);
+        //#endif
     }
+
+    /** The screen that is open right now, or null. In 26.2 the field moved from Minecraft into Gui. */
+    public static Screen screen(Minecraft c) {
+        //#if MC >= 26200
+        return fromGui(c, Screen.class, "screen", "getScreen");
+        //#else
+        return c.screen;
+        //#endif
+    }
+
+    /** True while the player has hidden the HUD with F1. In 26.2 the option moved, so it is looked up. */
+    public static boolean hideGui(Minecraft c) {
+        //#if MC >= 26200
+        Object o = fromGui(c, Object.class, "hideGui", "isHideGui");
+        if (o instanceof Boolean b) return b;
+        try {   // still an option?
+            return (boolean) c.options.getClass().getField("hideGui").get(c.options);
+        } catch (Throwable ignored) { return false; }
+        //#else
+        return c.options.hideGui;
+        //#endif
+    }
+
+    //#if MC >= 26200
+    /** Reads a value from Minecraft's Gui (or its hud) by method or field name, whatever it is called in this version. */
+    private static <T> T fromGui(Minecraft c, Class<T> type, String... names) {
+        Object[] owners = {c.gui, hudOf(c.gui), c.options};
+        for (Object owner : owners) {
+            if (owner == null) continue;
+            for (String n : names) {
+                try {
+                    java.lang.reflect.Method m = owner.getClass().getMethod(n);
+                    Object v = m.invoke(owner);
+                    if (type.isInstance(v)) return type.cast(v);
+                } catch (Throwable ignored) {}
+                try {
+                    java.lang.reflect.Field f = owner.getClass().getDeclaredField(n);
+                    f.setAccessible(true);
+                    Object v = f.get(owner);
+                    if (type.isInstance(v)) return type.cast(v);
+                } catch (Throwable ignored) {}
+            }
+        }
+        return null;
+    }
+
+    private static Object hudOf(Object gui) {
+        try {
+            java.lang.reflect.Field f = gui.getClass().getDeclaredField("hud");
+            f.setAccessible(true);
+            return f.get(gui);
+        } catch (Throwable e) { return null; }
+    }
+    //#endif
 
     /** Opens the vanilla resource pack screen; on versions where that is awkward it opens the options screen instead. */
     public static void openPacks(Minecraft c, Screen parent) {
-        c.setScreen(new net.minecraft.client.gui.screens.packs.PackSelectionScreen(c.getResourcePackRepository(),
-                manager -> { c.options.updateResourcePacks(manager); c.setScreen(parent); },
+        setScreen(c, new net.minecraft.client.gui.screens.packs.PackSelectionScreen(c.getResourcePackRepository(),
+                manager -> { c.options.updateResourcePacks(manager); setScreen(c, parent); },
                 c.getResourcePackDirectory(), Component.translatable("resourcePack.title")));
     }
 
@@ -63,8 +121,34 @@ public final class Mc {
     }
 
     public static void openUri(URI uri) {
+        //#if MC >= 26200
+        shellOpen(uri.toString());
+        //#else
         net.minecraft.util.Util.getPlatform().openUri(uri);
+        //#endif
     }
+
+    /** Opens a file or folder with the system's default program. */
+    public static void openFile(java.io.File f) {
+        //#if MC >= 26200
+        shellOpen(f.getAbsolutePath());
+        //#else
+        net.minecraft.util.Util.getPlatform().openFile(f);
+        //#endif
+    }
+
+    //#if MC >= 26200
+    private static void shellOpen(String target) {
+        try {
+            String os = System.getProperty("os.name", "").toLowerCase();
+            ProcessBuilder pb;
+            if (os.contains("win")) pb = new ProcessBuilder("rundll32", "url.dll,FileProtocolHandler", target);
+            else if (os.contains("mac")) pb = new ProcessBuilder("open", target);
+            else pb = new ProcessBuilder("xdg-open", target);
+            pb.start();
+        } catch (Throwable ignored) {}
+    }
+    //#endif
 
     /** The soft "click" every vanilla button makes (the method was renamed from master to ui in 1.21.11). */
     public static void clickSound(Minecraft c) {

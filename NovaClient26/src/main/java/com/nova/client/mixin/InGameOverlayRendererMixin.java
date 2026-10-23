@@ -1,5 +1,6 @@
 package com.nova.client.mixin;
 
+//#if MC < 26200
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.nova.client.NovaClient;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -12,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ScreenEffectRenderer.class)
 public abstract class InGameOverlayRendererMixin {
-    /** Moves the first-person fire overlay down so it stops covering the screen. The method's arguments changed in 1.21.4 and 1.21.9. */
+    /** Moves the first-person fire overlay down so it stops covering the screen. */
     @Inject(method = "renderFire", at = @At("HEAD"))
     private static void nova$lowFire(PoseStack matrices, MultiBufferSource vertexConsumers, TextureAtlasSprite sprite, CallbackInfo ci) {
         if (NovaClient.modules != null && NovaClient.modules.lowFire.isEnabled()) {
@@ -20,3 +21,12 @@ public abstract class InGameOverlayRendererMixin {
         }
     }
 }
+//#else
+import net.minecraft.client.renderer.ScreenEffectRenderer;
+import org.spongepowered.asm.mixin.Mixin;
+
+/** The fire overlay was rebuilt in 26.2: Low Fire is not ported yet, so this mixin does nothing there. */
+@Mixin(ScreenEffectRenderer.class)
+public abstract class InGameOverlayRendererMixin {
+}
+//#endif

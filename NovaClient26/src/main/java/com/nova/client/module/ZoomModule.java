@@ -1,6 +1,7 @@
 package com.nova.client.module;
 
 import com.nova.client.NovaClient;
+import com.nova.client.compat.Mc;
 import net.minecraft.client.Minecraft;
 
 /** Hold the zoom key (C by default) to zoom in with smooth camera. */
@@ -19,7 +20,7 @@ public class ZoomModule extends Module {
 
     public boolean isZooming() {
         Minecraft mc = Minecraft.getInstance();
-        return isEnabled() && NovaClient.zoomKey != null && NovaClient.zoomKey.isDown() && mc.screen == null;
+        return isEnabled() && NovaClient.zoomKey != null && NovaClient.zoomKey.isDown() && Mc.screen(mc) == null;
     }
 
     /** Multiplier applied to the field of view. */

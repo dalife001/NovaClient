@@ -59,7 +59,7 @@ public class SettingsScreen extends NovaScreen {
             status = "Checking for updates...";
         });
         button(x + half + 5, py() + 150, half, 20, "Open mods folder", false, () ->
-                net.minecraft.util.Util.getPlatform().openFile(
+                Mc.openFile(
                         net.fabricmc.loader.api.FabricLoader.getInstance().getGameDir().resolve("mods").toFile()));
 
         button(width / 2 - 50, py() + 196, 100, 22, "Back", false, this::nClose);

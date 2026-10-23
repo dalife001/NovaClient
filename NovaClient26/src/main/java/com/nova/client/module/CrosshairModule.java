@@ -33,7 +33,7 @@ public class CrosshairModule extends Module {
 
     @Override
     public void onRender(Gfx ctx, Minecraft mc) {
-        if (mc.options.hideGui || !Mc.firstPerson(mc)) return;
+        if (Mc.hideGui(mc) || !Mc.firstPerson(mc)) return;
         int cx = mc.getWindow().getGuiScaledWidth() / 2, cy = mc.getWindow().getGuiScaledHeight() / 2;
         int s = (int) size.get(), g = (int) gap.get(), t = (int) thickness.get();
         int c = argb(), o = 0xB0000000;

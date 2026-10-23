@@ -21,7 +21,7 @@ import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.resources.Identifier;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 
 public class NovaClient implements ClientModInitializer {
     public static final String NAME = "Nova Client";
@@ -40,18 +40,18 @@ public class NovaClient implements ClientModInitializer {
         PlayStats.onStart();
         modules = new ModuleManager();
 
-        openGuiKey = KeyMappingHelper.registerKeyMapping(Mc.newKey("key.novaclient.open_gui", GLFW.GLFW_KEY_RIGHT_SHIFT));
-        zoomKey = KeyMappingHelper.registerKeyMapping(Mc.newKey("key.novaclient.zoom", GLFW.GLFW_KEY_C));
+        openGuiKey = KeyMappingHelper.registerKeyMapping(Mc.newKey("key.novaclient.open_gui", InputConstants.KEY_RSHIFT));
+        zoomKey = KeyMappingHelper.registerKeyMapping(Mc.newKey("key.novaclient.zoom", InputConstants.KEY_C));
 
         // put the player's normal brightness back when the game closes
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> modules.fullbright.release());
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (client.screen instanceof TitleScreen) {
+            if (Mc.screen(client) instanceof TitleScreen) {
                 Mc.setScreen(client, new NovaTitleScreen());
             }
             while (openGuiKey.consumeClick()) {
-                if (client.screen == null) Mc.setScreen(client, new ClickGuiScreen(null));
+                if (Mc.screen(client) == null) Mc.setScreen(client, new ClickGuiScreen(null));
             }
             PlayStats.tick(client);
             if (!updateToasted && UpdateChecker.available()) {
@@ -70,10 +70,10 @@ public class NovaClient implements ClientModInitializer {
 
     private static void renderHud(Gfx context) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null && !mc.options.hideGui && !(mc.screen instanceof HudEditorScreen)) {
+        if (mc.player != null && !Mc.hideGui(mc) && !(Mc.screen(mc) instanceof HudEditorScreen)) {
             modules.onRender(context, mc);
         }
-        if (mc.screen == null) {
+        if (Mc.screen(mc) == null) {
             Toasts.render(context, mc.font, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
         }
     }
