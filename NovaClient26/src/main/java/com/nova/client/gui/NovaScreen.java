@@ -140,32 +140,22 @@ public abstract class NovaScreen extends Screen {
     private boolean lastDouble;
     private KeyEvent lastKey;
 
-    private static double mouseX() {
-        net.minecraft.client.Minecraft c = net.minecraft.client.Minecraft.getInstance();
-        return c.mouseHandler.xpos() * c.getWindow().getGuiScaledWidth() / (double) Math.max(1, c.getWindow().getScreenWidth());
-    }
-
-    private static double mouseY() {
-        net.minecraft.client.Minecraft c = net.minecraft.client.Minecraft.getInstance();
-        return c.mouseHandler.ypos() * c.getWindow().getGuiScaledHeight() / (double) Math.max(1, c.getWindow().getScreenHeight());
-    }
-
     @Override
     public boolean mouseClicked(MouseButtonEvent c, boolean doubled) {
         lastClick = c; lastDouble = doubled;
-        return nClick(mouseX(), mouseY(), c.button());
+        return nClick(c.x(), c.y(), c.button());
     }
 
     @Override
     public boolean mouseDragged(MouseButtonEvent c, double dx, double dy) {
         lastClick = c;
-        return nDrag(mouseX(), mouseY(), c.button(), dx, dy);
+        return nDrag(c.x(), c.y(), c.button(), dx, dy);
     }
 
     @Override
     public boolean mouseReleased(MouseButtonEvent c) {
         lastClick = c;
-        return nRelease(mouseX(), mouseY(), c.button());
+        return nRelease(c.x(), c.y(), c.button());
     }
 
     @Override
