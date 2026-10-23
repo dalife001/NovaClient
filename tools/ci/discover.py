@@ -78,8 +78,24 @@ def main():
         versions = [v for v in versions if v in only]
     manifest = {v["id"]: v["url"] for v in get(MOJANG)["versions"]}
 
-    include, skipped = [], []
+    include, include26, skipped = [], [], []
     for mc in versions:
+        if vkey(mc) >= (26,):
+            # Minecraft 26.x has no Yarn mappings: it is built from the NovaClient26 folder (Mojang names).
+            try:
+                q = f"{MODRINTH}/project/fabric-api/version?loaders=" + urllib.parse.quote('[\"fabric\"]') + "&game_versions=" + urllib.parse.quote(f'[\"{mc}\"]')
+                api = pick_fabric_api(get(q))
+                loaders = get(f"{FABRIC}/versions/loader/{mc}")
+                loader = loaders[0]["loader"]["version"] if loaders else None
+            except Exception as e:
+                skipped.append(f"{mc}: lookup failed ({e})")
+                continue
+            if not api or not loader:
+                skipped.append(f"{mc}: no {'Fabric API build' if not api else 'Fabric Loader'}")
+                continue
+            include26.append({"mc": mc, "fabric_api": api, "loader": loader, "tested": mc in tested,
+                              "loom": "1.16-SNAPSHOT" if vkey(mc) < (26, 2) else "1.17-SNAPSHOT"})
+            continue
         try:
             yarn = newest_yarn(get(f"{FABRIC}/versions/yarn/{mc}"))
             q = f"{MODRINTH}/project/fabric-api/version?loaders=" + urllib.parse.quote('["fabric"]') + "&game_versions=" + urllib.parse.quote(f'["{mc}"]')
@@ -94,18 +110,20 @@ def main():
         include.append({"mc": mc, "yarn": yarn, "fabric_api": api, "java": java, "jdk": max(21, java),
                         "tested": mc in tested, "loom": loom_for(mc), "gradle": gradle_for(mc)})
 
-    print(f"Building {len(include)} versions, skipping {len(skipped)}")
+    print(f"Building {len(include)} versions (Yarn) + {len(include26)} versions (26.x), skipping {len(skipped)}")
     for s in skipped:
         print("  skipped", s)
     if not include:
         sys.exit("No Minecraft versions to build")
     out = os.environ.get("GITHUB_OUTPUT")
-    line = "matrix=" + json.dumps({"include": include}, separators=(",", ":"))
+    lines = ["matrix=" + json.dumps({"include": include}, separators=(",", ":")),
+             "matrix26=" + json.dumps({"include": include26}, separators=(",", ":")),
+             "has26=" + ("true" if include26 else "false")]
     if out:
         with open(out, "a") as f:
-            f.write(line + "\n")
+            f.write("\n".join(lines) + "\n")
     else:
-        print(line)
+        print("\n".join(lines))
 
 
 if __name__ == "__main__":

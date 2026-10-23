@@ -31,6 +31,8 @@ jobs:
       tag: ${{ steps.ver.outputs.tag }}
       version: ${{ steps.ver.outputs.version }}
       matrix: ${{ steps.matrix.outputs.matrix }}
+      matrix26: ${{ steps.matrix.outputs.matrix26 }}
+      has26: ${{ steps.matrix.outputs.has26 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -104,6 +106,64 @@ jobs:
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           fi
 
+  # Minecraft 26.x: no Yarn mappings, built from the NovaClient26 folder with Mojang names and Java 25.
+  build26:
+    needs: plan
+    if: ${{ needs.plan.outputs.has26 == 'true' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix26) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.tag }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: current
+      - name: Build Nova for Minecraft ${{ matrix.mc }}
+        id: build
+        continue-on-error: true
+        working-directory: NovaClient26
+        run: |
+          set -o pipefail
+          gradle build --stacktrace --no-daemon \
+            -Pmod_version='${{ needs.plan.outputs.version }}' \
+            -Pminecraft_version='${{ matrix.mc }}' \
+            -Ploader_version='${{ matrix.loader }}' \
+            -Pfabric_version='${{ matrix.fabric_api }}' \
+            -Ploom_version='${{ matrix.loom }}' \
+            -Pjava_version=25 \
+            -Pstrict_mixins='${{ matrix.tested }}' 2>&1 | tee build.log
+      - name: Keep the build log of a failed version
+        if: steps.build.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: FAILED-log-${{ matrix.mc }}
+          path: NovaClient26/build.log
+      - name: Keep the jar
+        if: steps.build.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.mc }}
+          path: NovaClient26/build/libs/novaclient-${{ needs.plan.outputs.version }}.jar
+          if-no-files-found: error
+      - name: Note in the summary
+        run: |
+          if [ "${{ steps.build.outcome }}" = "success" ]; then
+            echo "- OK        ${{ matrix.mc }}  (26.x build)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- FAILED    ${{ matrix.mc }}  (26.x build; download the artifact FAILED-log-${{ matrix.mc }} and send it to whoever maintains the code)" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            { grep -E "error:|symbol: |location: " NovaClient26/build.log | sed 's#.*/pp/java/##' | awk '!seen[$0]++' | head -60
+              grep -A10 "What went wrong" NovaClient26/build.log | head -14; } >> "$GITHUB_STEP_SUMMARY" || true
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   launcher:
     needs: plan
     runs-on: ubuntu-latest
@@ -132,7 +192,7 @@ jobs:
           path: NovaLauncher/NovaLauncher.jar
 
   publish:
-    needs: [plan, build, launcher]
+    needs: [plan, build, build26, launcher]
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.launcher.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
