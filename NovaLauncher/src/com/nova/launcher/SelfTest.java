@@ -245,6 +245,31 @@ public final class SelfTest {
         auto.localModJar = localJar.toString();
         check("auto-pick: Local Nova jar decides the version", NovaUpdater.chooseMc(auto, null, null, tmp.resolve("empty")).equals("1.21.4"));
 
+        // one mods folder per Minecraft version
+        Path game = tmp.resolve("game");
+        Path oldMods = game.resolve("mods");
+        java.nio.file.Files.createDirectories(oldMods);
+        fakeMod(oldMods.resolve("mymod.jar"), "mymod", "My Mod", "1.21.4");
+        fakeMod(oldMods.resolve("othermod.jar"), "othermod", "Other Mod", "1.16.5");
+        fakeMod(oldMods.resolve("novaclient-0.6.0-mc1.21.4.jar"), "novaclient", "Nova Client", "1.21.4");
+        Path v1214 = NovaUpdater.modsDir(game, "1.21.4");
+        java.nio.file.Files.createDirectories(v1214);
+        Path vdir = NovaUpdater.versionDir(game, "1.21.4");
+        java.nio.file.Files.writeString(game.resolve("options.txt"), "fov:70");
+        java.nio.file.Files.createDirectories(game.resolve("resourcepacks"));
+        java.nio.file.Files.writeString(game.resolve("resourcepacks").resolve("pack.zip"), "x");
+        java.nio.file.Files.createDirectories(game.resolve("saves").resolve("World"));
+        NovaUpdater.adoptOldGame(game, vdir, "1.21.4");
+        check("per version: folder layout", v1214.equals(game.resolve("versions").resolve("1.21.4").resolve("mods")));
+        check("per version: options carried over once", java.nio.file.Files.readString(vdir.resolve("options.txt")).equals("fov:70"));
+        check("per version: resource packs carried over", java.nio.file.Files.exists(vdir.resolve("resourcepacks").resolve("pack.zip")));
+        check("per version: worlds are not copied", !java.nio.file.Files.exists(vdir.resolve("saves")));
+        check("per version: other versions are separate", !NovaUpdater.versionDir(game, "1.16.5").equals(vdir));
+        check("mods per version: your own mod is copied", java.nio.file.Files.exists(v1214.resolve("mymod.jar")));
+        check("mods per version: a mod for another version is not", !java.nio.file.Files.exists(v1214.resolve("othermod.jar")));
+        check("mods per version: Nova is left to the launcher", !java.nio.file.Files.exists(v1214.resolve("novaclient-0.6.0-mc1.21.4.jar")));
+        check("mods per version: old folder untouched", java.nio.file.Files.exists(oldMods.resolve("mymod.jar")));
+
         // optional mods (Sodium / Iris / Freecam)
         check("optional: parse ignores unknown names", OptionalMods.parse("iris, bogus ,freecam").toString().equals("[iris, freecam]"));
         check("optional: iris pulls sodium in first", OptionalMods.withRequirements(OptionalMods.parse("iris")).toString().equals("[sodium, iris]"));

@@ -18,7 +18,65 @@ final class NovaUpdater {
 
     static final String DEFAULT_MC = "1.21.4";
 
-    record Result(String mcVersion, String novaVersion, String latestLauncher, String launcherUrl, boolean novaLoaded) {}
+    record Result(String mcVersion, String novaVersion, String latestLauncher, String launcherUrl, boolean novaLoaded, Path versionDir) {}
+
+    /** Every Minecraft version gets its own game folder: its own mods, options, resource packs, worlds. */
+    static Path versionDir(Path gameDir, String mc) {
+        return gameDir.resolve("versions").resolve(mc.replaceAll("[^0-9A-Za-z._-]", "_"));
+    }
+
+    static Path modsDir(Path gameDir, String mc) { return versionDir(gameDir, mc).resolve("mods"); }
+
+    /**
+     * First time a version is played: it starts with your settings and your own mods from before, so nothing is lost.
+     * Copied: options.txt, servers.dat, resource packs, shader packs and your own mods that fit this version.
+     * Worlds are not copied (they can be big, and a world opened in a newer version cannot go back): they stay in the old folder.
+     * Nova, Fabric API, Sodium, Iris and Freecam are not copied: the launcher installs the right builds itself.
+     */
+    static void adoptOldGame(Path gameDir, Path vdir, String mc) {
+        try {
+            Path mods = vdir.resolve("mods");
+            Path earlier = gameDir.resolve("mods-by-version").resolve(mc);   // an earlier test build of the launcher used this
+            if (Files.isDirectory(earlier)) copyTree(earlier, mods);
+            else adoptOldMods(gameDir.resolve("mods"), mods, mc);
+            for (String f : new String[]{"options.txt", "servers.dat"}) {
+                Path src = gameDir.resolve(f);
+                if (Files.isRegularFile(src)) Files.copy(src, vdir.resolve(f), StandardCopyOption.REPLACE_EXISTING);
+            }
+            for (String d : new String[]{"resourcepacks", "shaderpacks"}) copyTree(gameDir.resolve(d), vdir.resolve(d));
+        } catch (IOException ignored) {}
+    }
+
+    private static void copyTree(Path from, Path to) throws IOException {
+        if (!Files.isDirectory(from)) return;
+        try (Stream<Path> s = Files.walk(from)) {
+            for (Path p : (Iterable<Path>) s::iterator) {
+                Path t = to.resolve(from.relativize(p).toString());
+                if (Files.isDirectory(p)) Files.createDirectories(t);
+                else { Files.createDirectories(t.getParent()); Files.copy(p, t, StandardCopyOption.REPLACE_EXISTING); }
+            }
+        }
+    }
+
+    /**
+     * Your own mods from the old shared folder that fit this version.
+     * Nova, Fabric API, Sodium, Iris and Freecam are not copied: the launcher installs the right builds itself.
+     */
+    static void adoptOldMods(Path old, Path mods, String mc) {
+        if (!Files.isDirectory(old)) return;
+        try (Stream<Path> s = Files.list(old)) {
+            for (Path f : (Iterable<Path>) s::iterator) {
+                String n = f.getFileName().toString();
+                String low = n.toLowerCase();
+                if (!low.endsWith(".jar") && !low.endsWith(".jar.disabled")) continue;
+                if (low.startsWith("novaclient-") || low.startsWith("fabric-api") || low.startsWith("sodium")
+                        || low.startsWith("iris") || low.startsWith("freecam")) continue;
+                JarInfo info = JarInfo.read(f);
+                if (info == null || !info.supports(mc)) continue;
+                try { Files.copy(f, mods.resolve(n), StandardCopyOption.REPLACE_EXISTING); } catch (IOException ignored) {}
+            }
+        } catch (IOException ignored) {}
+    }
 
     /** What the launcher plays when nothing is forced: the manifest's default, else the built-in mod's, else DEFAULT_MC. */
     static String defaultMc(NovaManifest man, Embedded emb) {
@@ -33,8 +91,7 @@ final class NovaUpdater {
     record Pick(String novaVersion, boolean loaded) {}
 
     static Result sync(LauncherConfig cfg, Path gameDir, Progress p) throws Exception {
-        Path mods = gameDir.resolve("mods");
-        Files.createDirectories(mods);
+        Path legacy = gameDir.resolve("mods");   // the old shared folder (only read, never written)
         Embedded emb = Embedded.load();
 
         NovaManifest man = null;
@@ -46,7 +103,13 @@ final class NovaUpdater {
                 p.status("Update check failed (" + e.getMessage() + "); using what is already installed");
             }
         }
-        String mc = chooseMc(cfg, man, emb, mods);
+        String mc = chooseMc(cfg, man, emb, legacy);
+
+        Path vdir = versionDir(gameDir, mc);
+        Path mods = vdir.resolve("mods");
+        boolean fresh = !Files.isDirectory(vdir);
+        Files.createDirectories(mods);
+        if (fresh) adoptOldGame(gameDir, vdir, mc);
 
         Pick pick = installNova(cfg, man, emb, mc, mods, p);
 
@@ -68,7 +131,7 @@ final class NovaUpdater {
             if (loaded && !hasFile(mods, "fabric-api-")) throw e;
             p.status("Could not check Fabric API updates; using the installed one");
         }
-        return new Result(mc, novaVersion, man == null ? null : man.launcherVersion(), man == null ? null : man.launcherUrl(), loaded);
+        return new Result(mc, novaVersion, man == null ? null : man.launcherVersion(), man == null ? null : man.launcherUrl(), loaded, vdir);
     }
 
     /**

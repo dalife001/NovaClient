@@ -157,8 +157,9 @@ public final class LauncherApp {
         orbit.onMods = this::openMods;
         orbit.onOfficial = this::addToOfficial;
         orbit.onFolder = () -> {
-            try { Files.createDirectories(gameDir); } catch (Exception ignored) {}
-            Platform.openFolder(gameDir);
+            Path vd = NovaUpdater.versionDir(gameDir, displayMc());
+            try { Files.createDirectories(vd); } catch (Exception ignored) {}
+            Platform.openFolder(vd);
         };
         orbit.onMin = () -> { if (frame != null) frame.setState(Frame.ICONIFIED); };
         orbit.onClose = () -> System.exit(0);
@@ -171,8 +172,9 @@ public final class LauncherApp {
     }
 
     private void openMods() {
-        try { Files.createDirectories(gameDir.resolve("mods")); } catch (Exception ignored) {}
-        new ModsDialog(frame, gameDir.resolve("mods"), this::displayMc, this::chooseOptionalMods).setVisible(true);
+        Path dir = NovaUpdater.modsDir(gameDir, displayMc());
+        try { Files.createDirectories(dir); } catch (Exception ignored) {}
+        new ModsDialog(frame, dir, this::displayMc, this::chooseOptionalMods).setVisible(true);
         orbit.mc = displayMc();
     }
 
@@ -419,11 +421,11 @@ public final class LauncherApp {
                 extra.add("-Dnova.theme=" + cfg.theme);
                 if (!cfg.manifestUrl.isBlank()) extra.add("-Dnova.manifest=" + cfg.manifestUrl);
                 if (!cfg.backgroundPath.isBlank()) extra.add("-Dnova.background=" + cfg.backgroundPath);
-                List<String> cmd = GameLauncher.command(plan, acct, java, gameDir, cfg.ramMb, extra);
+                List<String> cmd = GameLauncher.command(plan, acct, java, res.versionDir(), cfg.ramMb, extra);
 
                 setStatus("Minecraft is running");
                 SwingUtilities.invokeLater(() -> { orbit.indeterminate = false; orbit.progress = 1f; });
-                Process pr = GameLauncher.start(cmd, gameDir);
+                Process pr = GameLauncher.start(cmd, res.versionDir());
                 try (BufferedReader r = new BufferedReader(new InputStreamReader(pr.getInputStream(), StandardCharsets.UTF_8))) {
                     String line;
                     while ((line = r.readLine()) != null) log(line);
