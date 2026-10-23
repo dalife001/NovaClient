@@ -189,10 +189,16 @@ public final class Mc {
         //#endif
     }
 
+    //#if MC >= 2109
+    private static KeyBinding.Category NOVA_CATEGORY;
+    //#endif
+
     /** A new key binding in Nova's own category. */
     public static KeyBinding newKey(String id, int glfwKey) {
         //#if MC >= 2109
-        return new KeyBinding(id, glfwKey, KeyBinding.Category.create(net.minecraft.util.Identifier.of("novaclient", "main")));
+        // Category.create throws if the same id is registered twice, so every key shares one category.
+        if (NOVA_CATEGORY == null) NOVA_CATEGORY = KeyBinding.Category.create(net.minecraft.util.Identifier.of("novaclient", "main"));
+        return new KeyBinding(id, glfwKey, NOVA_CATEGORY);
         //#else
         return new KeyBinding(id, InputUtil.Type.KEYSYM, glfwKey, "category.novaclient");
         //#endif
