@@ -41,6 +41,22 @@ public final class Mc {
                 c.getResourcePackDirectory(), Component.translatable("resourcePack.title")));
     }
 
+    /** The vanilla options screen. Its constructor grew an extra flag in 26.x, so it is looked up instead of called directly. */
+    public static Screen optionsScreen(Screen parent, Minecraft c) {
+        try {
+            for (java.lang.reflect.Constructor<?> k : net.minecraft.client.gui.screens.options.OptionsScreen.class.getConstructors()) {
+                Class<?>[] p = k.getParameterTypes();
+                if (p.length < 2 || p[0] != Screen.class || p[1] != Options.class) continue;
+                Object[] args = new Object[p.length];
+                args[0] = parent;
+                args[1] = c.options;
+                for (int i = 2; i < p.length; i++) args[i] = p[i] == boolean.class ? Boolean.TRUE : null;
+                return (Screen) k.newInstance(args);
+            }
+        } catch (Throwable ignored) {}
+        return parent;
+    }
+
     public static void connect(Screen parent, Minecraft c, ServerData info) {
         ServerAddress addr = ServerAddress.parseString(info.ip);
         ConnectScreen.startConnecting(parent, c, addr, info, false, null);

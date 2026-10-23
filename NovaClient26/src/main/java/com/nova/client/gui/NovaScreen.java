@@ -3,7 +3,7 @@ package com.nova.client.gui;
 import com.nova.client.compat.Mc;
 import java.util.ArrayList;
 import java.util.List;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
@@ -120,13 +120,13 @@ public abstract class NovaScreen extends Screen {
 
     // ------------------------------------------------------------------ bridge to the real Screen methods
     @Override
-    public void renderBackground(GuiGraphics ctx, int mx, int my, float delta) {
+    public void extractBackground(GuiGraphicsExtractor ctx, int mx, int my, float delta) {
         nBackground(new Gfx(ctx), mx, my, delta);
     }
 
     @Override
-    public void render(GuiGraphics ctx, int mx, int my, float delta) {
-        super.render(ctx, mx, my, delta); // calls renderBackground, then the vanilla widgets
+    public void extractRenderState(GuiGraphicsExtractor ctx, int mx, int my, float delta) {
+        super.extractRenderState(ctx, mx, my, delta); // calls extractBackground, then the vanilla widgets
         nRender(new Gfx(ctx), mx, my, delta);
     }
 

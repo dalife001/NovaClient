@@ -101,7 +101,7 @@ public class NovaTitleScreen extends NovaScreen {
         } catch (Throwable ignored) {}
 
         add(new AnimButton(width - 112, height - 22, 50, 16, "Options", AnimButton.Style.GHOST,
-                () -> Mc.setScreen(minecraft, new OptionsScreen(this, minecraft.options))), 1.0f);
+                () -> Mc.setScreen(minecraft, Mc.optionsScreen(this, minecraft))), 1.0f);
         add(new AnimButton(width - 58, height - 22, 44, 16, "Quit", AnimButton.Style.GHOST, () -> minecraft.stop()), 1.0f);
 
         // the planet sits in the free space on the right

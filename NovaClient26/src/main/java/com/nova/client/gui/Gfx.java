@@ -1,7 +1,7 @@
 package com.nova.client.gui;
 
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 
@@ -13,9 +13,9 @@ import net.minecraft.world.item.ItemStack;
  * so the rest of the client only ever calls fill / fillGradient / text / push / translate / scale.
  */
 public final class Gfx {
-    private final GuiGraphics dc;
+    private final GuiGraphicsExtractor dc;
 
-    public Gfx(GuiGraphics dc) { this.dc = dc; }
+    public Gfx(GuiGraphicsExtractor dc) { this.dc = dc; }
 
     // ---------- shapes ----------
     public void fill(int x1, int y1, int x2, int y2, int color) {
@@ -28,11 +28,11 @@ public final class Gfx {
 
     // ---------- text ----------
     public void drawTextWithShadow(Font tr, String s, int x, int y, int color) {
-        dc.drawString(tr, s, x, y, color);
+        dc.text(tr, s, x, y, color);
     }
 
     public void drawCenteredTextWithShadow(Font tr, String s, int cx, int y, int color) {
-        dc.drawCenteredString(tr, s, cx, y, color);
+        dc.centeredText(tr, s, cx, y, color);
     }
 
     // ---------- transforms ----------
@@ -63,7 +63,7 @@ public final class Gfx {
 
     // ---------- items and pictures ----------
     public void drawItem(ItemStack stack, int x, int y) {
-        dc.renderItem(stack, x, y);
+        dc.item(stack, x, y);
     }
 
     /** Draws a whole texture stretched to w x h. Only available from 1.20 (older versions keep the built-in sky). */

@@ -17,8 +17,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
+import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 public class NovaClient implements ClientModInitializer {
@@ -38,8 +40,8 @@ public class NovaClient implements ClientModInitializer {
         PlayStats.onStart();
         modules = new ModuleManager();
 
-        openGuiKey = KeyBindingHelper.registerKeyBinding(Mc.newKey("key.novaclient.open_gui", GLFW.GLFW_KEY_RIGHT_SHIFT));
-        zoomKey = KeyBindingHelper.registerKeyBinding(Mc.newKey("key.novaclient.zoom", GLFW.GLFW_KEY_C));
+        openGuiKey = KeyMappingHelper.registerKeyMapping(Mc.newKey("key.novaclient.open_gui", GLFW.GLFW_KEY_RIGHT_SHIFT));
+        zoomKey = KeyMappingHelper.registerKeyMapping(Mc.newKey("key.novaclient.zoom", GLFW.GLFW_KEY_C));
 
         // put the player's normal brightness back when the game closes
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> modules.fullbright.release());
@@ -59,7 +61,8 @@ public class NovaClient implements ClientModInitializer {
             modules.onTick(client);
         });
 
-        HudRenderCallback.EVENT.register((context, tickCounter) -> renderHud(new Gfx(context)));
+        HudElementRegistry.attachElementAfter(VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath("novaclient", "hud"),
+                (context, tickCounter) -> renderHud(new Gfx(context)));
 
         AccountManager.tryAutoLogin();
         UpdateChecker.checkOnce();
