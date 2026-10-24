@@ -3,44 +3,59 @@ package com.nova.launcher;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import java.awt.*;
+import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 
-/** Browse Modrinth and install mods, resource packs and shaders for the chosen Minecraft version in one click. */
+/**
+ * Get mods, resource packs and shaders from Modrinth. Type to search, press Install on a row, done:
+ * no selecting, no extra windows. More results load by themselves as you scroll.
+ */
 final class ModrinthDialog extends JDialog {
-    private final Path versionDir;
+    private static final int PAGE = 20, ICON = 56;
+
+    private final Path versionDir, cacheDir;
     private final Supplier<String> mc;
-    private final DefaultListModel<Modrinth.Hit> model = new DefaultListModel<>();
-    private final JList<Modrinth.Hit> list = new JList<>(model);
+    private final JPanel rows = new JPanel();
+    private final JScrollPane scroll;
     private final JTextField query = new JTextField();
-    private final JComboBox<String> sort = new JComboBox<>(new String[]{"Most relevant", "Most downloaded", "Newest", "Recently updated"});
     private final JLabel status = LauncherApp.label(" ", 12, false, LauncherApp.MUTED);
-    private final JLabel heading = LauncherApp.label("", 13, false, LauncherApp.MUTED);
-    private final JProgressBar bar = new JProgressBar();
-    private final LauncherApp.NovaButton install = new LauncherApp.NovaButton("Install", true);
-    private final LauncherApp.NovaButton remove = new LauncherApp.NovaButton("Remove", false);
-    private final LauncherApp.NovaButton more = new LauncherApp.NovaButton("Show more", false);
     private final LauncherApp.NovaButton[] tabs = new LauncherApp.NovaButton[Modrinth.Kind.values().length];
-    private final Map<String, ImageIcon> icons = new ConcurrentHashMap<>();
-    private final ExecutorService pool = Executors.newFixedThreadPool(4, r -> { Thread t = new Thread(r, "nova-modrinth"); t.setDaemon(true); return t; });
+    private final LauncherApp.NovaButton popular = new LauncherApp.NovaButton("Popular", true);
+    private final LauncherApp.NovaButton newest = new LauncherApp.NovaButton("New", false);
+    private final Map<String, BufferedImage> icons = new ConcurrentHashMap<>();
+    private final Map<String, Row> rowById = new ConcurrentHashMap<>();
+    private final ExecutorService pool = Executors.newFixedThreadPool(6, r -> { Thread t = new Thread(r, "nova-modrinth"); t.setDaemon(true); return t; });
+    private final javax.swing.Timer debounce;
 
     private Modrinth.Kind kind = Modrinth.Kind.MOD;
-    private int offset, total;
-    private int generation;          // a newer search makes older answers stale
-    private volatile boolean busy;
+    private String sort = "downloads";
+    private int offset, total, generation;
+    private boolean loading;
 
     ModrinthDialog(Window owner, Path versionDir, Supplier<String> mc) {
         super(owner, "Get mods, packs and shaders", ModalityType.MODELESS);
         this.versionDir = versionDir;
         this.mc = mc;
+        Path home;
+        try { home = versionDir.toAbsolutePath().getParent().getParent().getParent().getParent(); } catch (Exception e) { home = Path.of(System.getProperty("java.io.tmpdir")); }
+        this.cacheDir = home.resolve("icon-cache");
+
+        // ---- top: title, tabs, search
+        JLabel title = LauncherApp.label("Get mods, packs and shaders", 22, true, LauncherApp.TEXT);
+        JLabel sub = LauncherApp.label("For Minecraft " + mc.get() + ". Press Install: it is ready next time you play.", 13, false, LauncherApp.MUTED);
 
         JPanel tabRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         tabRow.setOpaque(false);
@@ -50,269 +65,292 @@ final class ModrinthDialog extends JDialog {
             tabs[k.ordinal()] = b;
             tabRow.add(b);
         }
+        popular.addActionListener(e -> setSort("downloads"));
+        newest.addActionListener(e -> setSort("newest"));
+        JPanel sortRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        sortRow.setOpaque(false);
+        sortRow.add(popular);
+        sortRow.add(newest);
+        JPanel tabsAndSort = new JPanel(new BorderLayout());
+        tabsAndSort.setOpaque(false);
+        tabsAndSort.add(tabRow, BorderLayout.WEST);
+        tabsAndSort.add(sortRow, BorderLayout.EAST);
 
-        query.setFont(LauncherApp.font(Font.PLAIN, 14f));
+        query.setFont(LauncherApp.font(Font.PLAIN, 15f));
         query.setBackground(LauncherApp.SURFACE);
         query.setForeground(LauncherApp.TEXT);
         query.setCaretColor(LauncherApp.TEXT);
-        query.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(LauncherApp.BORDER), new EmptyBorder(7, 10, 7, 10)));
-        query.addActionListener(e -> search(true));
-        LauncherApp.NovaButton go = new LauncherApp.NovaButton("Search", false);
-        go.addActionListener(e -> search(true));
-        sort.addActionListener(e -> search(true));
-        JPanel searchRow = new JPanel(new BorderLayout(8, 0));
-        searchRow.setOpaque(false);
-        searchRow.add(query, BorderLayout.CENTER);
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        right.setOpaque(false);
-        right.add(sort);
-        right.add(go);
-        searchRow.add(right, BorderLayout.EAST);
+        query.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(LauncherApp.BORDER), new EmptyBorder(9, 12, 9, 12)));
+        query.putClientProperty("JTextField.placeholderText", "Search Modrinth...");
+        debounce = new javax.swing.Timer(350, e -> search(true));
+        debounce.setRepeats(false);
+        query.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent e) { debounce.restart(); }
+            public void removeUpdate(DocumentEvent e) { debounce.restart(); }
+            public void changedUpdate(DocumentEvent e) { debounce.restart(); }
+        });
 
         JPanel top = new JPanel();
         top.setOpaque(false);
         top.setLayout(new BoxLayout(top, BoxLayout.Y_AXIS));
-        JLabel title = LauncherApp.label("Get mods, packs and shaders", 22, true, LauncherApp.TEXT);
-        title.setAlignmentX(LEFT_ALIGNMENT);
-        heading.setAlignmentX(LEFT_ALIGNMENT);
-        tabRow.setAlignmentX(LEFT_ALIGNMENT);
-        searchRow.setAlignmentX(LEFT_ALIGNMENT);
+        for (JComponent c : new JComponent[]{title, sub, tabsAndSort, query}) c.setAlignmentX(LEFT_ALIGNMENT);
         top.add(title);
         top.add(Box.createVerticalStrut(2));
-        top.add(heading);
-        top.add(Box.createVerticalStrut(12));
-        top.add(tabRow);
+        top.add(sub);
+        top.add(Box.createVerticalStrut(14));
+        top.add(tabsAndSort);
         top.add(Box.createVerticalStrut(10));
-        top.add(searchRow);
+        top.add(query);
 
-        list.setBackground(LauncherApp.SURFACE);
-        list.setCellRenderer(new Cell());
-        list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        list.setFixedCellHeight(78);
-        list.addListSelectionListener(e -> updateButtons());
-        list.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override public void mouseClicked(java.awt.event.MouseEvent e) { if (e.getClickCount() == 2) installSelected(); }
+        // ---- the results
+        rows.setLayout(new BoxLayout(rows, BoxLayout.Y_AXIS));
+        rows.setBackground(LauncherApp.SURFACE);
+        scroll = new JScrollPane(rows, ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.setBorder(BorderFactory.createLineBorder(LauncherApp.BORDER));
+        scroll.getViewport().setBackground(LauncherApp.SURFACE);
+        scroll.getVerticalScrollBar().setUnitIncrement(28);
+        scroll.getVerticalScrollBar().addAdjustmentListener(e -> {
+            JScrollBar sb = scroll.getVerticalScrollBar();
+            if (!loading && offset < total && sb.getValue() + sb.getVisibleAmount() >= sb.getMaximum() - 240) search(false);
         });
-        JScrollPane sp = new JScrollPane(list);
-        sp.setBorder(BorderFactory.createLineBorder(LauncherApp.BORDER));
-        sp.getViewport().setBackground(LauncherApp.SURFACE);
-        sp.getVerticalScrollBar().setUnitIncrement(24);
 
-        install.addActionListener(e -> installSelected());
-        remove.addActionListener(e -> removeSelected());
-        more.addActionListener(e -> search(false));
-        LauncherApp.NovaButton open = new LauncherApp.NovaButton("Open on Modrinth", false);
-        open.addActionListener(e -> { Modrinth.Hit h = list.getSelectedValue(); if (h != null) Platform.open(Modrinth.pageUrl(h)); });
-        LauncherApp.NovaButton folder = new LauncherApp.NovaButton("Open folder", false);
-        folder.addActionListener(e -> {
-            Path d = versionDir.resolve(kind.folder);
-            try { java.nio.file.Files.createDirectories(d); } catch (Exception ignored) {}
-            Platform.openFolder(d);
-        });
-        LauncherApp.NovaButton close = new LauncherApp.NovaButton("Close", false);
+        LauncherApp.NovaButton close = new LauncherApp.NovaButton("Done", false);
         close.addActionListener(e -> dispose());
-
-        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        left.setOpaque(false);
-        left.add(install); left.add(remove); left.add(open); left.add(more); left.add(folder);
-        JPanel btns = new JPanel(new BorderLayout());
-        btns.setOpaque(false);
-        btns.add(left, BorderLayout.WEST);
-        btns.add(close, BorderLayout.EAST);
-
-        bar.setBorderPainted(false);
-        bar.setForeground(LauncherApp.GREEN);
-        bar.setBackground(LauncherApp.SURFACE);
-        bar.setPreferredSize(new Dimension(100, 4));
-        bar.setVisible(false);
-        JPanel south = new JPanel(new BorderLayout(0, 6));
+        JPanel south = new JPanel(new BorderLayout());
         south.setOpaque(false);
-        JPanel st = new JPanel(new BorderLayout(0, 4));
-        st.setOpaque(false);
-        st.add(status, BorderLayout.NORTH);
-        st.add(bar, BorderLayout.SOUTH);
-        south.add(st, BorderLayout.NORTH);
-        south.add(btns, BorderLayout.SOUTH);
+        south.add(status, BorderLayout.CENTER);
+        south.add(close, BorderLayout.EAST);
 
         JPanel p = new JPanel(new BorderLayout(0, 12));
         p.setBackground(LauncherApp.BG);
-        p.setBorder(new EmptyBorder(22, 26, 20, 26));
+        p.setBorder(new EmptyBorder(22, 26, 18, 26));
         p.add(top, BorderLayout.NORTH);
-        p.add(sp, BorderLayout.CENTER);
+        p.add(scroll, BorderLayout.CENTER);
         p.add(south, BorderLayout.SOUTH);
         setContentPane(p);
-        setPreferredSize(new Dimension(860, 680));
+        getRootPane().registerKeyboardAction(e -> dispose(), KeyStroke.getKeyStroke("ESCAPE"), JComponent.WHEN_IN_FOCUSED_WINDOW);
+        setPreferredSize(new Dimension(900, 720));
         pack();
         setLocationRelativeTo(owner);
         addWindowListener(new java.awt.event.WindowAdapter() {
-            @Override public void windowClosed(java.awt.event.WindowEvent e) { pool.shutdownNow(); }
+            @Override public void windowClosed(java.awt.event.WindowEvent e) { pool.shutdownNow(); debounce.stop(); }
+            @Override public void windowOpened(java.awt.event.WindowEvent e) { query.requestFocusInWindow(); }
         });
-        refreshHeading();
-        updateButtons();
         search(true);
-    }
-
-    private void refreshHeading() {
-        heading.setText("Everything here is installed for Minecraft " + mc.get() + ". Browse, pick one, press Install.");
     }
 
     private void switchKind(Modrinth.Kind k) {
         if (k == kind) return;
         kind = k;
-        for (Modrinth.Kind x : Modrinth.Kind.values()) tabs[x.ordinal()].setPrimary(x == kind);   // the open tab is the bright one
+        for (Modrinth.Kind x : Modrinth.Kind.values()) tabs[x.ordinal()].setPrimary(x == kind);
         search(true);
     }
 
-    private String sortKey() {
-        switch (sort.getSelectedIndex()) {
-            case 1: return "downloads";
-            case 2: return "newest";
-            case 3: return "updated";
-            default: return "relevance";
-        }
+    private void setSort(String s) {
+        if (s.equals(sort)) return;
+        sort = s;
+        popular.setPrimary(s.equals("downloads"));
+        newest.setPrimary(s.equals("newest"));
+        search(true);
     }
 
     // ------------------------------------------------------------------ searching
     private void search(boolean fresh) {
-        if (fresh) { offset = 0; model.clear(); }
+        if (fresh) {
+            offset = 0; total = 0;
+            rows.removeAll();
+            rowById.clear();
+            rows.revalidate();
+            rows.repaint();
+            scroll.getVerticalScrollBar().setValue(0);
+        }
         int gen = ++generation;
+        loading = true;
         Modrinth.Kind k = kind;
-        String q = query.getText(), version = mc.get(), s = sortKey();
+        String q = query.getText(), version = mc.get(), s = q.isBlank() ? sort : (sort.equals("newest") ? "newest" : "relevance");
         int off = offset;
-        status.setText(fresh ? "Searching Modrinth..." : "Loading more...");
+        status.setText(fresh ? "Searching..." : "Loading more...");
         pool.submit(() -> {
             try {
                 Modrinth.Page page = Modrinth.search(k, q, version, s, off);
                 SwingUtilities.invokeLater(() -> {
                     if (gen != generation) return;
-                    for (Modrinth.Hit h : page.hits()) model.addElement(h);
-                    offset += page.hits().size();
+                    loading = false;
+                    for (Modrinth.Hit h : page.hits()) {
+                        Row r = new Row(h);
+                        rowById.put(h.id(), r);
+                        rows.add(r);
+                        loadIcon(h);
+                    }
+                    offset += PAGE;
                     total = page.total();
-                    status.setText(model.isEmpty() ? "Nothing found for Minecraft " + version + ". Try another word or another tab."
-                            : model.size() + " of " + total + " shown");
-                    updateButtons();
-                    loadIcons(page.hits());
+                    rows.revalidate();
+                    rows.repaint();
+                    status.setText(rows.getComponentCount() == 0
+                            ? "Nothing found for Minecraft " + version + ". Try another word, or another tab."
+                            : total + " results");
                 });
             } catch (Exception e) {
                 SwingUtilities.invokeLater(() -> {
-                    if (gen == generation) status.setText("Could not reach Modrinth: " + e.getMessage());
+                    if (gen != generation) return;
+                    loading = false;
+                    status.setText("Could not reach Modrinth. Check your internet connection. (" + e.getMessage() + ")");
                 });
             }
         });
     }
 
-    private void loadIcons(List<Modrinth.Hit> hits) {
-        for (Modrinth.Hit h : hits) {
-            if (h.iconUrl() == null || icons.containsKey(h.id())) continue;
-            pool.submit(() -> {
-                try {
-                    BufferedImage img = ImageIO.read(new ByteArrayInputStream(Http.getBytes(h.iconUrl())));
-                    if (img == null) return;
-                    ImageIcon ic = new ImageIcon(img.getScaledInstance(52, 52, Image.SCALE_SMOOTH));
-                    icons.put(h.id(), ic);
-                    SwingUtilities.invokeLater(list::repaint);
-                } catch (Exception ignored) {}
-            });
-        }
-    }
-
-    // ------------------------------------------------------------------ install / remove
-    private void updateButtons() {
-        Modrinth.Hit h = list.getSelectedValue();
-        boolean have = h != null && isInstalled(h);
-        install.setEnabled(h != null && !busy && !have);
-        install.setText(have ? "Installed" : "Install");
-        remove.setEnabled(h != null && !busy && have);
-        more.setEnabled(!busy && offset < total);
-    }
-
-    private boolean isInstalled(Modrinth.Hit h) { return Modrinth.installed(versionDir, h.kind()).containsKey(h.id()); }
-
-    private void installSelected() {
-        Modrinth.Hit h = list.getSelectedValue();
-        if (h == null || busy || isInstalled(h)) return;
-        busy = true;
-        updateButtons();
-        bar.setIndeterminate(true);
-        bar.setVisible(true);
-        String version = mc.get();
+    // ------------------------------------------------------------------ icons
+    private void loadIcon(Modrinth.Hit h) {
+        BufferedImage have = icons.get(h.id());
+        if (have != null) return;
         pool.submit(() -> {
-            String result;
-            try {
-                List<String> added = Modrinth.install(h, version, versionDir, new Progress() {
-                    public void status(String m) { SwingUtilities.invokeLater(() -> status.setText(m)); }
-                    public void bar(int d, int t) {}
-                });
-                result = added.isEmpty() ? h.title() + " is already installed"
-                        : h.title() + " installed" + (added.size() > 1 ? " (with " + (added.size() - 1) + " required mod" + (added.size() > 2 ? "s" : "") + ")" : "")
-                          + ". It loads next time you press Play.";
-            } catch (Exception e) {
-                result = "Could not install " + h.title() + ": " + e.getMessage();
-            }
-            String msg = result;
-            SwingUtilities.invokeLater(() -> {
-                busy = false;
-                bar.setVisible(false);
-                status.setText(msg);
-                updateButtons();
-                list.repaint();
-            });
+            BufferedImage img = fetchIcon(h);
+            if (img == null) return;
+            icons.put(h.id(), img);
+            SwingUtilities.invokeLater(() -> { Row r = rowById.get(h.id()); if (r != null) r.repaint(); });
         });
     }
 
-    private void removeSelected() {
-        Modrinth.Hit h = list.getSelectedValue();
-        if (h == null || busy) return;
+    private BufferedImage fetchIcon(Modrinth.Hit h) {
+        Path cached = cacheDir.resolve(h.id() + ".png");
         try {
-            status.setText(Modrinth.remove(h.id(), h.kind(), versionDir) ? h.title() + " removed" : h.title() + " was not installed from here");
-        } catch (Exception e) {
-            status.setText("Could not remove " + h.title() + ": " + e.getMessage());
+            if (Files.isRegularFile(cached)) { BufferedImage c = ImageIO.read(cached.toFile()); if (c != null) return c; }
+        } catch (Exception ignored) {}
+        for (String url : Modrinth.iconCandidates(h.iconUrl())) {
+            try {
+                BufferedImage raw = ImageIO.read(new ByteArrayInputStream(Http.getBytes(url)));
+                if (raw == null) continue;
+                BufferedImage small = new BufferedImage(ICON * 2, ICON * 2, BufferedImage.TYPE_INT_ARGB);
+                Graphics2D g = small.createGraphics();
+                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                g.drawImage(raw.getScaledInstance(ICON * 2, ICON * 2, Image.SCALE_SMOOTH), 0, 0, null);
+                g.dispose();
+                try { Files.createDirectories(cacheDir); ImageIO.write(small, "png", cached.toFile()); } catch (Exception ignored) {}
+                return small;
+            } catch (Exception ignored) {}
         }
-        updateButtons();
-        list.repaint();
+        return null;
     }
 
-    // ------------------------------------------------------------------ one row of the list
-    private final class Cell extends JPanel implements ListCellRenderer<Modrinth.Hit> {
-        private final JLabel icon = new JLabel();
-        private final JLabel title = LauncherApp.label("", 15, true, LauncherApp.TEXT);
-        private final JLabel meta = LauncherApp.label("", 12, false, LauncherApp.MUTED);
-        private final JLabel desc = LauncherApp.label("", 12, false, LauncherApp.DIM);
+    // ------------------------------------------------------------------ one result
+    private final class Row extends JPanel {
+        private final Modrinth.Hit hit;
         private final JLabel tag = LauncherApp.label("", 12, true, LauncherApp.GREEN);
+        private final LauncherApp.NovaButton action = new LauncherApp.NovaButton("Install", true);
+        private boolean working;
 
-        Cell() {
-            super(new BorderLayout(12, 0));
-            setBorder(new EmptyBorder(10, 12, 10, 12));
-            icon.setPreferredSize(new Dimension(52, 52));
+        Row(Modrinth.Hit h) {
+            super(new BorderLayout(14, 0));
+            this.hit = h;
+            setBackground(LauncherApp.SURFACE);
+            setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, LauncherApp.BORDER), new EmptyBorder(11, 14, 11, 14)));
+            setPreferredSize(new Dimension(100, 88));
+            setMaximumSize(new Dimension(Integer.MAX_VALUE, 88));
+            setAlignmentX(LEFT_ALIGNMENT);
+
+            JComponent iconBox = new JComponent() {
+                @Override protected void paintComponent(Graphics g0) { paintIcon((Graphics2D) g0, getWidth(), getHeight()); }
+            };
+            iconBox.setPreferredSize(new Dimension(ICON, ICON));
+
+            JLabel name = LauncherApp.label(h.title(), 15, true, LauncherApp.TEXT);
+            JLabel meta = LauncherApp.label("by " + h.author() + "  \u00B7  " + count(h.downloads()) + " downloads", 12, false, LauncherApp.MUTED);
+            String d = h.description();
+            JLabel desc = LauncherApp.label(d.length() > 120 ? d.substring(0, 117) + "..." : d, 12, false, LauncherApp.DIM);
+            JPanel nameRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+            nameRow.setOpaque(false);
+            tag.setBorder(new EmptyBorder(0, 10, 0, 0));
+            nameRow.add(name);
+            nameRow.add(tag);
             JPanel text = new JPanel(new GridLayout(3, 1, 0, 1));
             text.setOpaque(false);
-            JPanel first = new JPanel(new BorderLayout(8, 0));
-            first.setOpaque(false);
-            first.add(title, BorderLayout.WEST);
-            first.add(tag, BorderLayout.CENTER);
-            text.add(first);
+            text.add(nameRow);
             text.add(meta);
             text.add(desc);
-            add(icon, BorderLayout.WEST);
+
+            action.addActionListener(e -> toggle());
+            JPanel east = new JPanel(new GridBagLayout());
+            east.setOpaque(false);
+            east.add(action);
+
+            add(iconBox, BorderLayout.WEST);
             add(text, BorderLayout.CENTER);
+            add(east, BorderLayout.EAST);
+            showState();
         }
 
-        @Override
-        public Component getListCellRendererComponent(JList<? extends Modrinth.Hit> l, Modrinth.Hit h, int i, boolean sel, boolean focus) {
-            setBackground(sel ? LauncherApp.SURFACE2 : LauncherApp.SURFACE);
-            icon.setIcon(icons.get(h.id()));
-            title.setText(h.title());
-            meta.setText("by " + h.author() + "  \u00B7  " + count(h.downloads()) + " downloads");
-            String d = h.description();
-            desc.setText(d.length() > 110 ? d.substring(0, 107) + "..." : d);
-            tag.setText(isInstalled(h) ? "  installed" : "");
-            return this;
+        private boolean installed() { return Modrinth.installed(versionDir, hit.kind()).containsKey(hit.id()); }
+
+        private void showState() {
+            boolean in = installed();
+            tag.setText(in ? "\u2713 installed" : "");
+            action.setText(working ? "Installing..." : in ? "Remove" : "Install");
+            action.setPrimary(!in && !working);
+            action.setEnabled(!working);
+        }
+
+        private void toggle() {
+            if (working) return;
+            if (installed()) {
+                try {
+                    Modrinth.remove(hit.id(), hit.kind(), versionDir);
+                    status.setText(hit.title() + " removed");
+                } catch (Exception e) {
+                    status.setText("Could not remove " + hit.title() + ": " + e.getMessage());
+                }
+                showState();
+                return;
+            }
+            working = true;
+            showState();
+            String version = mc.get();
+            pool.submit(() -> {
+                String result;
+                try {
+                    List<String> added = Modrinth.install(hit, version, versionDir, new Progress() {
+                        public void status(String m) { SwingUtilities.invokeLater(() -> ModrinthDialog.this.status.setText(m)); }
+                        public void bar(int d, int t) {}
+                    });
+                    int extra = Math.max(0, added.size() - 1);
+                    result = hit.title() + " installed" + (extra > 0 ? " (plus " + extra + " mod" + (extra > 1 ? "s" : "") + " it needs)" : "") + ". It loads next time you press Play.";
+                } catch (Exception e) {
+                    result = "Could not install " + hit.title() + ": " + e.getMessage();
+                }
+                String msg = result;
+                SwingUtilities.invokeLater(() -> {
+                    working = false;
+                    ModrinthDialog.this.status.setText(msg);
+                    showState();
+                });
+            });
+        }
+
+        private void paintIcon(Graphics2D g, int w, int h) {
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            Shape clip = new RoundRectangle2D.Float(0, 0, w, h, 14, 14);
+            g.setClip(clip);
+            BufferedImage img = icons.get(hit.id());
+            if (img != null) {
+                g.drawImage(img, 0, 0, w, h, null);
+            } else {
+                // not loaded (yet): a tile in the project's own colour with its first letter, so a row never looks empty
+                Color base = hit.color() != 0 ? new Color(hit.color() & 0xFFFFFF) : new Color(Math.abs(hit.title().hashCode()) % 0xFFFFFF);
+                g.setPaint(new GradientPaint(0, 0, base.brighter(), w, h, base.darker().darker()));
+                g.fillRect(0, 0, w, h);
+                g.setColor(Color.WHITE);
+                g.setFont(LauncherApp.font(Font.BOLD, 24f));
+                String letter = hit.title().isEmpty() ? "?" : hit.title().substring(0, 1).toUpperCase(Locale.ROOT);
+                FontMetrics fm = g.getFontMetrics();
+                g.drawString(letter, (w - fm.stringWidth(letter)) / 2, (h + fm.getAscent() - fm.getDescent()) / 2);
+            }
         }
     }
 
     static String count(long n) {
-        if (n >= 1_000_000) return String.format("%.1fM", n / 1_000_000.0);
-        if (n >= 1_000) return String.format("%.1fK", n / 1_000.0);
+        if (n >= 1_000_000) return String.format(Locale.ROOT, "%.1fM", n / 1_000_000.0);
+        if (n >= 1_000) return String.format(Locale.ROOT, "%.1fK", n / 1_000.0);
         return Long.toString(n);
     }
 }

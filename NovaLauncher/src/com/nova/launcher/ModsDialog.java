@@ -118,7 +118,7 @@ final class ModsDialog extends JDialog {
         left.setOpaque(false);
         LauncherApp.NovaButton extras = new LauncherApp.NovaButton("Sodium / Iris / Freecam...", false);
         extras.addActionListener(e -> { chooseOptional.run(); });
-        LauncherApp.NovaButton get = new LauncherApp.NovaButton("Get from Modrinth...", true);
+        LauncherApp.NovaButton get = new LauncherApp.NovaButton("Get mods, packs and shaders", true);
         get.addActionListener(e -> {
             ModrinthDialog d = new ModrinthDialog(this, dir.getParent(), mc);
             d.addWindowListener(new java.awt.event.WindowAdapter() {
@@ -126,7 +126,7 @@ final class ModsDialog extends JDialog {
             });
             d.setVisible(true);
         });
-        left.add(get); left.add(add); left.add(remove); left.add(open); left.add(extras);
+        left.add(get); left.add(add); left.add(remove); left.add(open);
         JPanel btns = new JPanel(new BorderLayout());
         btns.setOpaque(false);
         btns.add(left, BorderLayout.WEST);

@@ -304,10 +304,16 @@ public final class SelfTest {
         check("modrinth: resource packs have no loader filter", !Modrinth.searchUrl(Modrinth.Kind.PACK, "", "1.21.4", "relevance", 0).contains("fabric"));
         check("modrinth: shaders are limited to Iris", Modrinth.searchUrl(Modrinth.Kind.SHADER, "", "1.21.4", "relevance", 0).contains("categories%3Airis"));
         Modrinth.Page pg = Modrinth.parseSearch(Json.o(Json.parse("{\"hits\":[{\"project_id\":\"AANobbMI\",\"slug\":\"sodium\",\"title\":\"Sodium\","
-                + "\"author\":\"jellysquid3\",\"description\":\"A modern rendering engine\",\"downloads\":123456789,\"icon_url\":\"https://cdn.modrinth.com/x.png\"}],"
+                + "\"author\":\"jellysquid3\",\"description\":\"A modern rendering engine\",\"downloads\":123456789,\"icon_url\":\"https://cdn.modrinth.com/x.png\",\"color\":16711680},"
+                + "{\"project_id\":\"P7dR8mSH\",\"slug\":\"fabric-api\",\"title\":\"Fabric API\"}],"
                 + "\"offset\":0,\"limit\":20,\"total_hits\":57}")), Modrinth.Kind.MOD);
         check("modrinth: search answer is read", pg.total() == 57 && pg.hits().size() == 1 && pg.hits().get(0).title().equals("Sodium")
                 && pg.hits().get(0).downloads() == 123456789L);
+        check("modrinth: Fabric API is not offered (the launcher installs it)", pg.hits().stream().noneMatch(x -> x.id().equals("P7dR8mSH")));
+        check("modrinth: the project colour is kept for the placeholder tile", pg.hits().get(0).color() == 16711680);
+        java.util.List<String> iconList = Modrinth.iconCandidates("https://cdn.modrinth.com/data/AANobbMI/295862f4_96.webp");
+        check("modrinth: a WebP thumbnail falls back to the original image", iconList.get(0).equals("https://cdn.modrinth.com/data/AANobbMI/295862f4.png") && iconList.size() == 4);
+        check("modrinth: a normal icon address is used as it is", Modrinth.iconCandidates("https://cdn/x.png").equals(java.util.List.of("https://cdn/x.png")));
         check("modrinth: download counts are short", ModrinthDialog.count(123456789L).equals("123.5M") && ModrinthDialog.count(1500).equals("1.5K") && ModrinthDialog.count(12).equals("12"));
         String versions = "[{\"id\":\"v3\",\"project_id\":\"P1\",\"name\":\"Beta 3\",\"version_type\":\"beta\",\"files\":[{\"filename\":\"mod-3.jar\",\"url\":\"https://cdn/mod-3.jar\",\"primary\":true,\"hashes\":{\"sha512\":\"b3\"}}],\"dependencies\":[]},"
                 + "{\"id\":\"v2\",\"project_id\":\"P1\",\"name\":\"Release 2\",\"version_type\":\"release\","

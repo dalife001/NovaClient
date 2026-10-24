@@ -28,7 +28,7 @@ final class Modrinth {
         Kind(String type, String label, String folder, String ext) { this.type = type; this.label = label; this.folder = folder; this.ext = ext; }
     }
 
-    record Hit(String id, String slug, String title, String author, String description, long downloads, String iconUrl, Kind kind) {}
+    record Hit(String id, String slug, String title, String author, String description, long downloads, String iconUrl, int color, Kind kind) {}
     record Page(List<Hit> hits, int total) {}
     record Dep(String projectId, String type) {}
     record Version(String id, String projectId, String name, String filename, String url, String sha512, List<Dep> deps) {}
@@ -54,9 +54,9 @@ final class Modrinth {
         for (Object o : Json.a(body.get("hits"))) {
             Map<String, Object> h = Json.o(o);
             String id = Json.str(h, "project_id");
-            if (id == null) continue;
+            if (id == null || id.equals(FABRIC_API_ID)) continue;   // the launcher installs Fabric API itself
             out.add(new Hit(id, Json.str(h, "slug"), orEmpty(Json.str(h, "title")), orEmpty(Json.str(h, "author")),
-                    orEmpty(Json.str(h, "description")), Json.num(h, "downloads"), Json.str(h, "icon_url"), kind));
+                    orEmpty(Json.str(h, "description")), Json.num(h, "downloads"), Json.str(h, "icon_url"), h.get("color") instanceof Number c ? c.intValue() : 0, kind));
         }
         return new Page(out, (int) Json.num(body, "total_hits"));
     }
@@ -174,6 +174,19 @@ final class Modrinth {
         state.remove(projectId);
         saveInstalled(versionDir, kind, state);
         return true;
+    }
+
+    /**
+     * Where to try to get a project's icon. Modrinth hands out small WebP thumbnails, which Java cannot read, so the
+     * original upload (same hash, a normal image type) is tried next. Package-private for the self test.
+     */
+    static List<String> iconCandidates(String url) {
+        List<String> out = new ArrayList<>();
+        if (url == null || url.isBlank()) return out;
+        if (!url.toLowerCase().endsWith(".webp")) { out.add(url); return out; }
+        String base = url.replaceAll("(_\\d+)?\\.webp$", "");
+        for (String ext : new String[]{".png", ".jpg", ".jpeg", ".gif"}) out.add(base + ext);
+        return out;
     }
 
     static String pageUrl(Hit h) { return "https://modrinth.com/" + h.kind().type + "/" + (h.slug() != null ? h.slug() : h.id()); }
