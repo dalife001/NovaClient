@@ -1,5 +1,6 @@
 package com.nova.client.gui;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.nova.client.compat.Mc;
 import com.nova.client.NovaClient;
 import com.nova.client.PlayStats;
@@ -214,7 +215,7 @@ public class NovaTitleScreen extends NovaScreen {
 
     @Override
     protected boolean nClick(double mx, double my, int button) {
-        if (button == 0) {
+        if (button == InputConstants.MOUSE_BUTTON_LEFT) {
             if (Ui.inside(mx, my, pillX, pillY, pillW, pillH)) {
                 click();
                 Mc.setScreen(minecraft, new ProfileScreen(this));

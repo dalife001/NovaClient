@@ -1,5 +1,6 @@
 package com.nova.client.gui;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.nova.client.NovaClient;
 import com.nova.client.module.HudModule;
 import com.nova.client.module.Module;
@@ -59,7 +60,7 @@ public class HudEditorScreen extends NovaScreen {
 
     @Override
     protected boolean nClick(double mx, double my, int button) {
-        if (button == 0) {
+        if (button == InputConstants.MOUSE_BUTTON_LEFT) {
             List<HudModule> l = huds();
             for (int i = l.size() - 1; i >= 0; i--) {
                 int[] b = l.get(i).bounds(minecraft);

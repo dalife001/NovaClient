@@ -1,5 +1,6 @@
 package com.nova.client.gui;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.nova.client.compat.Mc;
 import java.util.ArrayList;
 import java.util.List;
@@ -94,7 +95,7 @@ public abstract class NovaScreen extends Screen {
     }
 
     protected boolean nClick(double mx, double my, int button) {
-        if (button == 0) {
+        if (button == InputConstants.MOUSE_BUTTON_LEFT) {
             for (AnimButton b : buttons) {
                 if (b.hit(mx, my)) {
                     click();
@@ -136,6 +137,7 @@ public abstract class NovaScreen extends Screen {
     @Override
     public boolean isPauseScreen() { return pausesGame(); }
 
+    private static int clickLog = 0;
     private MouseButtonEvent lastClick;
     private boolean lastDouble;
     private KeyEvent lastKey;
@@ -143,6 +145,10 @@ public abstract class NovaScreen extends Screen {
     @Override
     public boolean mouseClicked(MouseButtonEvent c, boolean doubled) {
         lastClick = c; lastDouble = doubled;
+        if (clickLog++ < 12) {
+            System.out.println("[Nova] click x=" + c.x() + " y=" + c.y() + " button=" + c.button()
+                    + " screen=" + width + "x" + height + " nova-buttons=" + buttons.size() + " in " + getClass().getSimpleName());
+        }
         return nClick(c.x(), c.y(), c.button());
     }
 

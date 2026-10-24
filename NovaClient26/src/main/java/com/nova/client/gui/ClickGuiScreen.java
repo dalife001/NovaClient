@@ -237,7 +237,7 @@ public class ClickGuiScreen extends NovaScreen {
     // ---------------- input ----------------
     @Override
     protected boolean nClick(double mx, double my, int button) {
-        if (button == 0) {
+        if (button == InputConstants.MOUSE_BUTTON_LEFT) {
             layout();
             // tabs
             for (int i = 0; i < TABS.length; i++) {
