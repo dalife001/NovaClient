@@ -314,7 +314,7 @@ public final class SelfTest {
         java.util.List<String> iconList = Modrinth.iconCandidates("https://cdn.modrinth.com/data/AANobbMI/295862f4_96.webp");
         check("modrinth: a WebP thumbnail falls back to the original image", iconList.get(0).equals("https://cdn.modrinth.com/data/AANobbMI/295862f4.png") && iconList.size() == 4);
         check("modrinth: a normal icon address is used as it is", Modrinth.iconCandidates("https://cdn/x.png").equals(java.util.List.of("https://cdn/x.png")));
-        check("modrinth: download counts are short", ModrinthDialog.count(123456789L).equals("123.5M") && ModrinthDialog.count(1500).equals("1.5K") && ModrinthDialog.count(12).equals("12"));
+        check("modrinth: download counts are short", ModrinthPanel.count(123456789L).equals("123.5M") && ModrinthPanel.count(1500).equals("1.5K") && ModrinthPanel.count(12).equals("12"));
         String versions = "[{\"id\":\"v3\",\"project_id\":\"P1\",\"name\":\"Beta 3\",\"version_type\":\"beta\",\"files\":[{\"filename\":\"mod-3.jar\",\"url\":\"https://cdn/mod-3.jar\",\"primary\":true,\"hashes\":{\"sha512\":\"b3\"}}],\"dependencies\":[]},"
                 + "{\"id\":\"v2\",\"project_id\":\"P1\",\"name\":\"Release 2\",\"version_type\":\"release\","
                 + "\"files\":[{\"filename\":\"mod-2-sources.jar\",\"url\":\"https://cdn/src.jar\",\"primary\":false,\"hashes\":{\"sha512\":\"s\"}},"
