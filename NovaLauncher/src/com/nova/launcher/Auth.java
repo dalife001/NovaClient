@@ -1,6 +1,15 @@
 package com.nova.launcher;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.util.*;
 
 /** Microsoft -> Xbox -> XSTS -> Minecraft login with the device-code flow (no password typed here). */
@@ -37,6 +46,149 @@ final class Auth {
             if (e == null || (!e.equals("authorization_pending") && !e.equals("slow_down"))) throw new IOException(err(o));
         }
         throw new IOException("Login code expired");
+    }
+
+    /** The page that opens with the code already filled in, so nothing has to be typed. */
+    static String codeLink(DeviceCode dc) {
+        String u = dc.verificationUri();
+        return u + (u.contains("?") ? "&" : "?") + "otc=" + URLEncoder.encode(dc.userCode(), StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Sign in through the browser: the player logs in on Microsoft's own page and is sent back to a tiny page on this
+     * computer (PKCE, so no secret is stored and no code is typed). Needs "http://localhost" as a redirect address on the app.
+     */
+    static final class BrowserLogin implements AutoCloseable {
+        private final String clientId, verifier, state;
+        private final ServerSocket server;
+        private final String redirect;
+        private volatile boolean cancelled;
+
+        BrowserLogin(String clientId) throws IOException {
+            this.clientId = clientId;
+            this.verifier = random(48);
+            this.state = random(18);
+            this.server = new ServerSocket(0, 4, InetAddress.getLoopbackAddress());
+            this.redirect = "http://localhost:" + server.getLocalPort();
+        }
+
+        String url() {
+            return TENANT + "/authorize?client_id=" + enc(clientId) + "&response_type=code&redirect_uri=" + enc(redirect)
+                    + "&response_mode=query&scope=" + enc(SCOPE) + "&state=" + enc(state)
+                    + "&code_challenge=" + challenge(verifier) + "&code_challenge_method=S256&prompt=select_account";
+        }
+
+        /** Waits for the browser to come back, then trades the answer for tokens. */
+        Tokens await(int seconds) throws Exception {
+            long end = System.currentTimeMillis() + seconds * 1000L;
+            server.setSoTimeout(500);
+            while (!cancelled && System.currentTimeMillis() < end) {
+                Socket s;
+                try {
+                    s = server.accept();
+                } catch (SocketTimeoutException e) {
+                    continue;
+                } catch (IOException e) {
+                    if (cancelled) break;
+                    throw e;
+                }
+                try (s) {
+                    s.setSoTimeout(3000);
+                    byte[] buf = new byte[8192];
+                    int n = Math.max(0, s.getInputStream().read(buf));
+                    String head = new String(buf, 0, n, StandardCharsets.ISO_8859_1);
+                    Map<String, String> q = parseQuery(head.lines().findFirst().orElse(""));
+                    if (!q.containsKey("code") && !q.containsKey("error")) { reply(s, 404, "Not found", false); continue; }
+                    if (!state.equals(q.get("state"))) { reply(s, 400, "This sign-in link is not from the current attempt.", false); continue; }
+                    if (q.containsKey("error")) {
+                        reply(s, 200, "Sign-in was cancelled or refused. You can close this tab.", false);
+                        String d = q.get("error_description");
+                        throw new IOException(d != null ? d : q.get("error"));
+                    }
+                    Map<String, String> f = new LinkedHashMap<>();
+                    f.put("grant_type", "authorization_code");
+                    f.put("client_id", clientId);
+                    f.put("code", q.get("code"));
+                    f.put("redirect_uri", redirect);
+                    f.put("code_verifier", verifier);
+                    f.put("scope", SCOPE);
+                    Map<String, Object> o = Http.postForm(TENANT + "/token", f);
+                    if (!o.containsKey("access_token")) {
+                        reply(s, 200, "Something went wrong. You can close this tab and try again in Nova.", false);
+                        throw new IOException(err(o));
+                    }
+                    reply(s, 200, "You are signed in. You can close this tab and go back to Nova.", true);
+                    return tokens(o);
+                }
+            }
+            if (cancelled) throw new IOException("Sign-in cancelled");
+            throw new IOException("Sign-in timed out");
+        }
+
+        void cancel() { cancelled = true; close(); }
+
+        @Override public void close() { try { server.close(); } catch (IOException ignored) {} }
+    }
+
+    /** The query of a request line like "GET /?code=abc&state=xyz HTTP/1.1", as a map. */
+    static Map<String, String> parseQuery(String requestLine) {
+        Map<String, String> m = new LinkedHashMap<>();
+        String[] parts = requestLine.split(" ");
+        if (parts.length < 2) return m;
+        int i = parts[1].indexOf('?');
+        if (i < 0) return m;
+        for (String kv : parts[1].substring(i + 1).split("&")) {
+            int e = kv.indexOf('=');
+            if (e <= 0) continue;
+            m.put(URLDecoder.decode(kv.substring(0, e), StandardCharsets.UTF_8), URLDecoder.decode(kv.substring(e + 1), StandardCharsets.UTF_8));
+        }
+        return m;
+    }
+
+    static String challenge(String verifier) {
+        try {
+            byte[] h = MessageDigest.getInstance("SHA-256").digest(verifier.getBytes(StandardCharsets.US_ASCII));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(h);
+        } catch (Exception e) { throw new IllegalStateException(e); }
+    }
+
+    private static String random(int bytes) {
+        byte[] b = new byte[bytes];
+        new SecureRandom().nextBytes(b);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(b);
+    }
+
+    private static String enc(String s) { return URLEncoder.encode(s, StandardCharsets.UTF_8); }
+
+    private static void reply(Socket s, int code, String message, boolean good) throws IOException {
+        String html = "<!doctype html><meta charset=utf-8><title>Nova</title><body style=\"margin:0;height:100vh;display:flex;"
+                + "align-items:center;justify-content:center;background:#080816;color:#f4f0ff;font:18px system-ui,sans-serif\">"
+                + "<div style=\"text-align:center\"><div style=\"font-size:44px;letter-spacing:.3em;color:" + (good ? "#8ef0b0" : "#ff8fa3") + "\">nova</div>"
+                + "<p>" + message + "</p></div>";
+        byte[] body = html.getBytes(StandardCharsets.UTF_8);
+        String head = "HTTP/1.1 " + code + (code == 200 ? " OK" : " Error") + "\r\nContent-Type: text/html; charset=utf-8\r\n"
+                + "Content-Length: " + body.length + "\r\nConnection: close\r\n\r\n";
+        s.getOutputStream().write(head.getBytes(StandardCharsets.ISO_8859_1));
+        s.getOutputStream().write(body);
+        s.getOutputStream().flush();
+    }
+
+    /** A message a player can act on instead of a raw server answer. */
+    static String friendly(String message) {
+        String m = message == null ? "" : message;
+        if (m.contains("Invalid app registration") || m.contains("approved by Mojang"))
+            return "Microsoft accepted your login, but Minecraft's servers refused this launcher. Its Microsoft app has not been approved by Mojang yet.";
+        if (m.contains("does not own Minecraft"))
+            return "This Microsoft account does not own Minecraft: Java Edition.";
+        if (m.contains("no Xbox profile") || m.contains("child account"))
+            return "This account has no Xbox profile yet (or it is a child account). Sign in once at xbox.com, or ask an adult to add it to a family.";
+        if (m.contains("AADSTS700016") || m.contains("unauthorized_client") || m.contains("invalid_client"))
+            return "The Microsoft app ID in this launcher is not valid. Check it in Settings.";
+        if (m.contains("redirect_uri") || m.contains("AADSTS50011"))
+            return "The Microsoft app is missing the 'http://localhost' redirect address. Use the code sign-in instead, or add it in the Azure portal.";
+        if (m.contains("timed out") || m.contains("expired")) return "The sign-in took too long. Try again.";
+        if (m.contains("cancelled")) return "Sign-in cancelled.";
+        return m;
     }
 
     static Tokens refresh(String clientId, String refreshToken) throws Exception {

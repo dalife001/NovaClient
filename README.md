@@ -140,9 +140,23 @@ What needs you once per Minecraft release: nothing for the pipeline (it finds th
 compile, fix the code that Mojang renamed and tag again. `latest.json` names the default Minecraft version, and every launcher set to "automatic" moves to it.
 
 ## Login
-Create a free Azure app (personal accounts, "Allow public client flows"), paste its client ID in
-launcher Settings (and `config/novaclient.json` for in-game login). Mojang must approve new apps
-before Minecraft login works. Tokens are stored in plain text in `launcher.json`: keep it private.
+Players click **sign in** in the launcher. A window offers two ways:
+- **Sign in with Microsoft**: the browser opens on Microsoft's own page, the player logs in with their Xbox / Microsoft
+  account and the launcher picks the answer up by itself (no code to type).
+- **Use a code instead**: a short code (already copied) and a link that opens with the code filled in. Works from a phone
+  or another computer, or when the browser cannot reach back to this PC.
+
+Your password is never typed into Nova. The player stays signed in; the token is kept in `launcher.json`, so keep that private.
+
+**One-time setup for you (the developer), so players need nothing:**
+1. Create a free app at https://portal.azure.com > Microsoft Entra ID > App registrations > New registration.
+   Account type: *Personal Microsoft accounts only*. Redirect URI: platform *Mobile and desktop applications*,
+   value `http://localhost`. Under Authentication turn on **Allow public client flows**.
+2. Ask Mojang to approve the app for Minecraft login (https://aka.ms/mce-reviewappid). Until then, the login ends with
+   "Invalid app registration".
+3. In your GitHub repo: Settings > Secrets and variables > Actions > **Variables** > new variable `AZURE_CLIENT_ID`
+   with the app's *Application (client) ID*. The release pipeline builds it into the launcher and passes it to the game.
+You can still override it per player in launcher Settings.
 
 ## Package as a real app (.exe / .app / .deb)
 ```

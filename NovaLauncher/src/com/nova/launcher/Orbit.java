@@ -27,7 +27,7 @@ final class Orbit extends JComponent {
     private static final double TAU = Math.PI * 2;
 
     // ------------------------------------------------------------------ state (set by LauncherApp)
-    String status = "Ready", who = "Not logged in", loginText = "log in with microsoft", mc = "1.21.4", note = "", noteUrl, themeName = "";
+    String status = "Ready", who = "Not logged in", loginText = "sign in", mc = "1.21.4", note = "", noteUrl, themeName = "";
     int ramMb = 4096;
     boolean working, indeterminate, loggedIn;
     float progress;

@@ -7,7 +7,9 @@ import java.util.Map;
 
 /** Saved in launcher.json inside the launcher folder. Contains a login token: keep it private. */
 final class LauncherConfig {
-    String azureClientId = "";
+    String azureClientId = DEFAULT_CLIENT_ID;
+    /** The release pipeline writes the Microsoft app (client) ID here, so players never have to create one. */
+    static final String DEFAULT_CLIENT_ID = "";
     String refreshToken = "";
     String offlineName = "Player";
     /** URL of latest.json (see README) that tells the launcher the newest Nova version. */
@@ -38,6 +40,7 @@ final class LauncherConfig {
             if (Files.exists(file())) {
                 Map<String, Object> m = Json.o(Json.parse(Files.readString(file())));
                 c.azureClientId = s(m, "azureClientId", c.azureClientId);
+                if (c.azureClientId.isBlank()) c.azureClientId = DEFAULT_CLIENT_ID;
                 c.refreshToken = s(m, "refreshToken", c.refreshToken);
                 c.offlineName = s(m, "offlineName", c.offlineName);
                 c.manifestUrl = s(m, "manifestUrl", c.manifestUrl);

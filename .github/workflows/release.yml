@@ -180,6 +180,16 @@ jobs:
           URL="https://github.com/${{ github.repository }}/releases/latest/download/latest.json"
           sed -i "s#DEFAULT_MANIFEST = \"\";#DEFAULT_MANIFEST = \"$URL\";#" NovaLauncher/src/com/nova/launcher/LauncherConfig.java
           grep -n "DEFAULT_MANIFEST =" NovaLauncher/src/com/nova/launcher/LauncherConfig.java
+      - name: Build in the Microsoft app ID (repository variable AZURE_CLIENT_ID)
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+        run: |
+          if [ -n "$AZURE_CLIENT_ID" ]; then
+            sed -i "s#DEFAULT_CLIENT_ID = \"\";#DEFAULT_CLIENT_ID = \"$AZURE_CLIENT_ID\";#" NovaLauncher/src/com/nova/launcher/LauncherConfig.java
+            grep -n "DEFAULT_CLIENT_ID =" NovaLauncher/src/com/nova/launcher/LauncherConfig.java
+          else
+            echo "No AZURE_CLIENT_ID variable set: players will have to paste an app ID in Settings."
+          fi
       - name: Build launcher
         working-directory: NovaLauncher
         run: bash ./build.sh

@@ -100,7 +100,7 @@ final class ModsDialog extends JDialog {
         });
         sp.setTransferHandler(table.getTransferHandler());
 
-        LauncherApp.NovaButton add = new LauncherApp.NovaButton("Import mod...", true);
+        LauncherApp.NovaButton add = new LauncherApp.NovaButton("Import mod...", false);
         add.addActionListener(e -> {
             JFileChooser fc = new JFileChooser();
             fc.setMultiSelectionEnabled(true);
@@ -118,7 +118,15 @@ final class ModsDialog extends JDialog {
         left.setOpaque(false);
         LauncherApp.NovaButton extras = new LauncherApp.NovaButton("Sodium / Iris / Freecam...", false);
         extras.addActionListener(e -> { chooseOptional.run(); });
-        left.add(add); left.add(remove); left.add(open); left.add(extras);
+        LauncherApp.NovaButton get = new LauncherApp.NovaButton("Get from Modrinth...", true);
+        get.addActionListener(e -> {
+            ModrinthDialog d = new ModrinthDialog(this, dir.getParent(), mc);
+            d.addWindowListener(new java.awt.event.WindowAdapter() {
+                @Override public void windowClosed(java.awt.event.WindowEvent we) { reload(); }   // show what was just installed
+            });
+            d.setVisible(true);
+        });
+        left.add(get); left.add(add); left.add(remove); left.add(open); left.add(extras);
         JPanel btns = new JPanel(new BorderLayout());
         btns.setOpaque(false);
         btns.add(left, BorderLayout.WEST);

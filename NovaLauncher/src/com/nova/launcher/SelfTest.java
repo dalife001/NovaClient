@@ -270,6 +270,66 @@ public final class SelfTest {
         check("mods per version: Nova is left to the launcher", !java.nio.file.Files.exists(v1214.resolve("novaclient-0.6.0-mc1.21.4.jar")));
         check("mods per version: old folder untouched", java.nio.file.Files.exists(oldMods.resolve("mymod.jar")));
 
+        // sign-in
+        check("login: PKCE challenge matches the RFC 7636 example",
+                Auth.challenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk").equals("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"));
+        java.util.Map<String, String> pq = Auth.parseQuery("GET /?code=a%20b&state=xyz HTTP/1.1");
+        check("login: the address the browser comes back to is read", "a b".equals(pq.get("code")) && "xyz".equals(pq.get("state")));
+        check("login: a request without a query is ignored", Auth.parseQuery("GET /favicon.ico HTTP/1.1").isEmpty());
+        check("login: the code page has the code filled in",
+                Auth.codeLink(new Auth.DeviceCode("d", "AB12CD", "https://www.microsoft.com/link", 5, 900)).equals("https://www.microsoft.com/link?otc=AB12CD"));
+        check("login: Mojang approval error is explained", Auth.friendly("Minecraft login refused: Invalid app registration").contains("approved by Mojang"));
+        try (Auth.BrowserLogin b = new Auth.BrowserLogin("test-client")) {
+            String signInUrl = b.url();
+            java.util.Map<String, String> u = Auth.parseQuery("GET " + signInUrl.substring(signInUrl.indexOf("/authorize")) + " HTTP/1.1");
+            int port = Integer.parseInt(u.get("redirect_uri").substring(u.get("redirect_uri").lastIndexOf(':') + 1));
+            check("login: sign-in link carries PKCE and the local return address",
+                    "S256".equals(u.get("code_challenge_method")) && u.get("code_challenge") != null && u.get("redirect_uri").startsWith("http://localhost:"));
+            Throwable[] result = new Throwable[1];
+            Thread waiter = new Thread(() -> { try { b.await(20); } catch (Throwable t) { result[0] = t; } });
+            waiter.start();
+            String wrong = httpGet(port, "/?code=abc&state=not-mine");
+            check("login: an answer from another attempt is refused", wrong.startsWith("HTTP/1.1 400"));
+            String denied = httpGet(port, "/?error=access_denied&error_description=nope&state=" + u.get("state"));
+            check("login: the browser page answers", denied.startsWith("HTTP/1.1 200") && denied.contains("nova"));
+            waiter.join(5000);
+            check("login: a refused sign-in is reported", result[0] != null && "nope".equals(result[0].getMessage()));
+        }
+
+        // Modrinth browser
+        String su = Modrinth.searchUrl(Modrinth.Kind.MOD, "sod ium", "1.21.4", "downloads", 20);
+        check("modrinth: mods are searched on Fabric for the chosen version",
+                su.contains("project_type%3Amod") && su.contains("versions%3A1.21.4") && su.contains("categories%3Afabric")
+                        && su.contains("query=sod+ium") && su.contains("index=downloads") && su.contains("offset=20"));
+        check("modrinth: resource packs have no loader filter", !Modrinth.searchUrl(Modrinth.Kind.PACK, "", "1.21.4", "relevance", 0).contains("fabric"));
+        check("modrinth: shaders are limited to Iris", Modrinth.searchUrl(Modrinth.Kind.SHADER, "", "1.21.4", "relevance", 0).contains("categories%3Airis"));
+        Modrinth.Page pg = Modrinth.parseSearch(Json.o(Json.parse("{\"hits\":[{\"project_id\":\"AANobbMI\",\"slug\":\"sodium\",\"title\":\"Sodium\","
+                + "\"author\":\"jellysquid3\",\"description\":\"A modern rendering engine\",\"downloads\":123456789,\"icon_url\":\"https://cdn.modrinth.com/x.png\"}],"
+                + "\"offset\":0,\"limit\":20,\"total_hits\":57}")), Modrinth.Kind.MOD);
+        check("modrinth: search answer is read", pg.total() == 57 && pg.hits().size() == 1 && pg.hits().get(0).title().equals("Sodium")
+                && pg.hits().get(0).downloads() == 123456789L);
+        check("modrinth: download counts are short", ModrinthDialog.count(123456789L).equals("123.5M") && ModrinthDialog.count(1500).equals("1.5K") && ModrinthDialog.count(12).equals("12"));
+        String versions = "[{\"id\":\"v3\",\"project_id\":\"P1\",\"name\":\"Beta 3\",\"version_type\":\"beta\",\"files\":[{\"filename\":\"mod-3.jar\",\"url\":\"https://cdn/mod-3.jar\",\"primary\":true,\"hashes\":{\"sha512\":\"b3\"}}],\"dependencies\":[]},"
+                + "{\"id\":\"v2\",\"project_id\":\"P1\",\"name\":\"Release 2\",\"version_type\":\"release\","
+                + "\"files\":[{\"filename\":\"mod-2-sources.jar\",\"url\":\"https://cdn/src.jar\",\"primary\":false,\"hashes\":{\"sha512\":\"s\"}},"
+                + "{\"filename\":\"mod-2.jar\",\"url\":\"https://cdn/mod-2.jar\",\"primary\":true,\"hashes\":{\"sha512\":\"b2\"}}],"
+                + "\"dependencies\":[{\"project_id\":\"P7dR8mSH\",\"dependency_type\":\"required\"},{\"project_id\":\"LIB\",\"dependency_type\":\"required\"},{\"project_id\":\"OPT\",\"dependency_type\":\"optional\"}]}]";
+        Modrinth.Version mv = Modrinth.pickVersion(Json.a(Json.parse(versions)), Modrinth.Kind.MOD);
+        check("modrinth: the newest release wins over a beta", mv != null && mv.id().equals("v2"));
+        check("modrinth: the real jar is chosen, not the sources", mv != null && mv.filename().equals("mod-2.jar") && mv.sha512().equals("b2"));
+        check("modrinth: required mods are listed", mv != null && mv.deps().size() == 3 && mv.deps().get(1).projectId().equals("LIB") && mv.deps().get(1).type().equals("required"));
+        String packVersions = "[{\"id\":\"p1\",\"project_id\":\"PK\",\"name\":\"Pack\",\"version_type\":\"release\",\"files\":[{\"filename\":\"pack.zip\",\"url\":\"https://cdn/pack.zip\",\"primary\":true,\"hashes\":{\"sha512\":\"z\"}}],\"dependencies\":[]}]";
+        check("modrinth: a resource pack is a zip", Modrinth.pickVersion(Json.a(Json.parse(packVersions)), Modrinth.Kind.PACK).filename().equals("pack.zip"));
+        check("modrinth: a pack is not taken as a mod", Modrinth.pickVersion(Json.a(Json.parse(packVersions)), Modrinth.Kind.MOD) == null);
+        check("modrinth: a file name cannot leave the folder", Modrinth.safeName("../../evil.jar").equals("evil.jar"));
+        Path mrDir = tmp.resolve("mr");
+        java.nio.file.Files.createDirectories(mrDir.resolve("mods"));
+        java.nio.file.Files.writeString(mrDir.resolve("mods").resolve("mod-2.jar"), "x");
+        java.nio.file.Files.writeString(mrDir.resolve("mods").resolve(".nova-modrinth.json"), "{\"P1\":{\"title\":\"Mod\",\"file\":\"mod-2.jar\",\"version\":\"Release 2\"}}");
+        check("modrinth: installed mods are remembered", Modrinth.installed(mrDir, Modrinth.Kind.MOD).containsKey("P1"));
+        check("modrinth: removing deletes the file and the note", Modrinth.remove("P1", Modrinth.Kind.MOD, mrDir)
+                && !java.nio.file.Files.exists(mrDir.resolve("mods").resolve("mod-2.jar")) && !Modrinth.installed(mrDir, Modrinth.Kind.MOD).containsKey("P1"));
+
         // optional mods (Sodium / Iris / Freecam)
         check("optional: parse ignores unknown names", OptionalMods.parse("iris, bogus ,freecam").toString().equals("[iris, freecam]"));
         check("optional: iris pulls sodium in first", OptionalMods.withRequirements(OptionalMods.parse("iris")).toString().equals("[sodium, iris]"));
@@ -296,5 +356,14 @@ public final class SelfTest {
 
     private static void fill(BufferedImage i, int x, int y, int w, int h, int argb) {
         for (int yy = y; yy < y + h; yy++) for (int xx = x; xx < x + w; xx++) i.setRGB(xx, yy, argb);
+    }
+
+    private static String httpGet(int port, String path) throws Exception {
+        try (java.net.Socket sk = new java.net.Socket("127.0.0.1", port)) {
+            sk.setSoTimeout(5000);
+            sk.getOutputStream().write(("GET " + path + " HTTP/1.1\r\nHost: localhost\r\n\r\n").getBytes());
+            sk.getOutputStream().flush();
+            return new String(sk.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
     }
 }

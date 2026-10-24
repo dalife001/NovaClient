@@ -310,34 +310,27 @@ public final class LauncherApp {
             cfg.save();
             orbit.loggedIn = false;
             orbit.who = "Not logged in";
-            orbit.loginText = "log in with microsoft";
+            orbit.loginText = "sign in";
             orbit.setSkin(null, false);
             return;
         }
         if (cfg.azureClientId.isBlank()) {
-            JOptionPane.showMessageDialog(frame, "Open Settings and paste your Azure app client ID first (see README).",
-                    "Microsoft login", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(frame, "This launcher has no Microsoft app ID built in yet.\n"
+                    + "Ask whoever gave you Nova for the latest launcher, or paste an app ID in Settings.",
+                    "Sign in", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
-        async(() -> {
+        new LoginDialog(frame, cfg.azureClientId, tokens -> async(() -> {
             try {
-                setStatus("Requesting login code...");
-                Auth.DeviceCode dc = Auth.start(cfg.azureClientId);
-                SwingUtilities.invokeLater(() -> {
-                    Toolkit.getDefaultToolkit().getSystemClipboard()
-                            .setContents(new java.awt.datatransfer.StringSelection(dc.userCode()), null);
-                    Platform.open(dc.verificationUri());
-                    JOptionPane.showMessageDialog(frame, "Your code is  " + dc.userCode() + "  (copied to clipboard).\n"
-                            + "A browser page was opened at " + dc.verificationUri() + "\nEnter the code there, then wait here.",
-                            "Microsoft login", JOptionPane.INFORMATION_MESSAGE);
-                });
-                setStatus("Waiting for you to finish logging in...");
-                finishLogin(Auth.poll(cfg.azureClientId, dc));
+                setStatus("Signing in...");
+                finishLogin(tokens);
             } catch (Exception e) {
                 log("Login failed: " + e.getMessage());
-                setStatus("Login failed: " + e.getMessage());
+                setStatus("Login failed: " + Auth.friendly(e.getMessage()));
+                SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(frame, Auth.friendly(e.getMessage()),
+                        "Sign in", JOptionPane.WARNING_MESSAGE));
             }
-        });
+        }), this::log).setVisible(true);
     }
 
     private void finishLogin(Auth.Tokens t) throws Exception {
@@ -420,6 +413,7 @@ public final class LauncherApp {
                 List<String> extra = new ArrayList<>();
                 extra.add("-Dnova.theme=" + cfg.theme);
                 if (!cfg.manifestUrl.isBlank()) extra.add("-Dnova.manifest=" + cfg.manifestUrl);
+                if (!cfg.azureClientId.isBlank()) extra.add("-Dnova.azure=" + cfg.azureClientId);
                 if (!cfg.backgroundPath.isBlank()) extra.add("-Dnova.background=" + cfg.backgroundPath);
                 List<String> cmd = GameLauncher.command(plan, acct, java, res.versionDir(), cfg.ramMb, extra);
 
@@ -580,7 +574,8 @@ public final class LauncherApp {
 
     // ------------------------------------------------------------------ components
     static final class NovaButton extends JButton {
-        private final boolean primary; private boolean hover; Glyph glyph;
+        private boolean primary; private boolean hover; Glyph glyph;
+        void setPrimary(boolean b) { primary = b; repaint(); }
         NovaButton(String text, boolean primary) {
             super(text);
             this.primary = primary;
