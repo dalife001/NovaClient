@@ -1,0 +1,13 @@
+{
+  "required": ${mixin_required},
+  "package": "com.nova.client.mixin",
+  "compatibilityLevel": "${java_level}",
+  "client": [
+    "MinecraftClientAccessor",
+    "GameRendererMixin",
+    "InGameHudMixin",
+    "InGameOverlayRendererMixin"
+    ,"SimpleOptionAccessor"
+  ],
+  "injectors": { "defaultRequire": ${mixin_require} }
+}

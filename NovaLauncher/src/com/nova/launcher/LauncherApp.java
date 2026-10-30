@@ -154,7 +154,7 @@ public final class LauncherApp {
         orbit.onTheme = this::nextTheme;
         orbit.onSkin = this::openSkinManager;
         orbit.onVersion = this::openVersions;
-        orbit.onMods = this::openMods;
+        orbit.onMods = this::openModsPanel;
         orbit.onOfficial = this::addToOfficial;
         orbit.onFolder = () -> {
             Path vd = NovaUpdater.versionDir(gameDir, displayMc());
@@ -170,6 +170,14 @@ public final class LauncherApp {
     /** The Minecraft version shown (and played): the picked one, or whatever "automatic" resolves to. */
     private String displayMc() {
         return NovaUpdater.chooseMc(cfg, manifest, Embedded.load(), gameDir.resolve("mods"));
+    }
+
+    private void openModsPanel() {
+        SkinManagerDialog panel = new SkinManagerDialog(cfg, account, skinDirectory(), NovaUpdater.modsDir(gameDir, displayMc()), this::displayMc,
+                orbit::setSkin, this::useAccountSkin, null);
+        panel.setCloseAction(() -> orbit.hideSidePanel(panel));
+        panel.showModsOnOpen();
+        orbit.showSidePanel(panel);
     }
 
     private void openMods() {
@@ -357,7 +365,11 @@ public final class LauncherApp {
     private Path skinDirectory() { return home.resolve("skins"); }
 
     private void openSkinManager() {
-        new SkinManagerDialog(frame, cfg, account, skinDirectory(), orbit::setSkin, this::useAccountSkin).setVisible(true);
+        SkinManagerDialog panel = new SkinManagerDialog(cfg, account, skinDirectory(), NovaUpdater.modsDir(gameDir, displayMc()), this::displayMc,
+                orbit::setSkin, this::useAccountSkin, null);
+        panel.setCloseAction(() -> orbit.hideSidePanel(panel));
+        panel.lookupOnOpen("The_lifeasteler");
+        orbit.showSidePanel(panel);
     }
 
     private void applySavedSkin() {

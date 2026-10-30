@@ -39,7 +39,6 @@ final class Modrinth {
         StringBuilder f = new StringBuilder("[[\"project_type:" + kind.type + "\"]");
         if (mc != null && !mc.isBlank()) f.append(",[\"versions:").append(mc).append("\"]");
         if (kind == Kind.MOD) f.append(",[\"categories:fabric\"]");
-        if (kind == Kind.SHADER) f.append(",[\"categories:iris\"]");
         f.append("]");
         return API + "/search?query=" + enc(query == null ? "" : query.trim()) + "&facets=" + enc(f.toString())
                 + "&index=" + enc(sort == null ? "relevance" : sort) + "&limit=20&offset=" + offset;

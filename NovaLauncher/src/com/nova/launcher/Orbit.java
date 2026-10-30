@@ -38,6 +38,8 @@ final class Orbit extends JComponent {
     private int scroll;
     private boolean consoleOpen;
     private float consoleT;
+    private JComponent sidePanel;
+    private Timer panelTimer;
 
     // ------------------------------------------------------------------ scene
     private BufferedImage buf;
@@ -109,6 +111,40 @@ final class Orbit extends JComponent {
     // ------------------------------------------------------------------ API
     void setSkin(java.awt.image.BufferedImage skin, boolean slim) {
         skinPx = SkinRenderer.front(skin == null ? defaultSkin() : skin, slim);
+    }
+
+    void showSidePanel(JComponent panel) {
+        if (sidePanel != null) remove(sidePanel);
+        sidePanel = panel;
+        add(panel);
+        int pw = Math.min(900, Math.max(620, getWidth() - 240));
+        int ph = Math.min(570, getHeight() - 110);
+        panel.setBounds(getWidth(), Math.max(48, (getHeight() - ph) / 2), pw, ph);
+        panel.setVisible(true);
+        if (panelTimer != null) panelTimer.stop();
+        panelTimer = new Timer(15, e -> {
+            int target = getWidth() - panel.getWidth() - 34;
+            int next = panel.getX() + (target - panel.getX()) / 4;
+            if (Math.abs(target - next) < 3) { next = target; ((Timer) e.getSource()).stop(); }
+            panel.setLocation(next, Math.max(48, (getHeight() - panel.getHeight()) / 2));
+            repaint();
+        });
+        panelTimer.start();
+        revalidate();
+        repaint();
+    }
+
+    void hideSidePanel(JComponent panel) {
+        if (sidePanel != panel) return;
+        if (panelTimer != null) panelTimer.stop();
+        panelTimer = new Timer(15, e -> {
+            int next = panel.getX() + (getWidth() - panel.getX()) / 4;
+            if (getWidth() - next < 3) {
+                remove(panel); sidePanel = null; ((Timer) e.getSource()).stop(); revalidate();
+            } else panel.setLocation(next, panel.getY());
+            repaint();
+        });
+        panelTimer.start();
     }
     void addLog(String s) {
         lines.add(s);

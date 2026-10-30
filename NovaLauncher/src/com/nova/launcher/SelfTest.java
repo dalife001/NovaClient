@@ -303,7 +303,7 @@ public final class SelfTest {
                 su.contains("project_type%3Amod") && su.contains("versions%3A1.21.4") && su.contains("categories%3Afabric")
                         && su.contains("query=sod+ium") && su.contains("index=downloads") && su.contains("offset=20"));
         check("modrinth: resource packs have no loader filter", !Modrinth.searchUrl(Modrinth.Kind.PACK, "", "1.21.4", "relevance", 0).contains("fabric"));
-        check("modrinth: shaders are limited to Iris", Modrinth.searchUrl(Modrinth.Kind.SHADER, "", "1.21.4", "relevance", 0).contains("categories%3Airis"));
+        check("modrinth: shaders include all compatible loaders", !Modrinth.searchUrl(Modrinth.Kind.SHADER, "", "1.21.4", "relevance", 0).contains("categories%3Airis"));
         Modrinth.Page pg = Modrinth.parseSearch(Json.o(Json.parse("{\"hits\":[{\"project_id\":\"AANobbMI\",\"slug\":\"sodium\",\"title\":\"Sodium\","
                 + "\"author\":\"jellysquid3\",\"description\":\"A modern rendering engine\",\"downloads\":123456789,\"icon_url\":\"https://cdn.modrinth.com/x.png\",\"color\":16711680},"
                 + "{\"project_id\":\"P7dR8mSH\",\"slug\":\"fabric-api\",\"title\":\"Fabric API\"}],"

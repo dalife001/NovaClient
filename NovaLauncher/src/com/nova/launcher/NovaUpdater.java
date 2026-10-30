@@ -177,8 +177,8 @@ final class NovaUpdater {
         }
 
         NovaManifest.Build b = man == null ? null : man.builds().get(mc);
-        boolean embMatches = emb != null && mc.equals(emb.minecraft);
-        if (b != null && man.version() != null && (!embMatches || Versions.cmp(man.version(), emb.version) > 0)) {
+        boolean embMatches = emb != null && emb.supports(mc);
+        if (b != null && man.version() != null && (!embMatches || Versions.cmp(man.version(), emb.version(mc)) > 0)) {
             String name = jarName(man.version(), mc);
             try {
                 p.status("Getting Nova Client " + man.version() + " for Minecraft " + mc + "...");
@@ -190,9 +190,12 @@ final class NovaUpdater {
             }
         }
         if (embMatches) {
-            try (InputStream in = emb.jar()) { installJar(in, mods, emb.version + "-mc" + mc); }
-            p.status("Nova Client " + emb.version + " is ready");
-            return new Pick(emb.version + " (built in)", true);
+            try (InputStream in = emb.jar(mc)) {
+                if (in == null) throw new IOException("Bundled Nova jar missing for Minecraft " + mc);
+                installJar(in, mods, emb.version(mc) + "-mc" + mc);
+            }
+            p.status("Bundled Nova Client " + emb.version(mc) + " is ready for Minecraft " + mc);
+            return new Pick(emb.version(mc) + " (built in)", true);
         }
         String cached = cachedFor(mods, mc);
         if (cached != null) {

@@ -16,57 +16,95 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 
 /** Launcher skin library: look up public Java skins, save any number, preview, and optionally upload to your account. */
-final class SkinManagerDialog extends JDialog {
+final class SkinManagerDialog extends JPanel {
     private final LauncherConfig cfg;
     private final Account account;
     private final Path directory;
+    private final Path modsDirectory;
+    private final Supplier<String> minecraftVersion;
     private final BiConsumer<BufferedImage, Boolean> previewSink;
     private final Runnable accountSkinAction;
+    private Runnable closeAction;
     private final DefaultListModel<String> model = new DefaultListModel<>();
     private final JList<String> list = new JList<>(model);
+    private final DefaultListModel<String> modModel = new DefaultListModel<>();
+    private final JList<String> modList = new JList<>(modModel);
+    private final CardLayout workspaceLayout = new CardLayout();
+    private final JPanel workspace = new JPanel(workspaceLayout);
     private final JTextField username = new JTextField();
     private final JLabel status = new JLabel("Find a username or import a skin PNG. Saved skins stay on this computer.");
     private final JLabel preview = new JLabel("", SwingConstants.CENTER);
     private final JButton applyButton = new JButton("Use in launcher");
     private final JButton uploadButton = new JButton("Apply to Minecraft account");
+    private final List<JButton> actionButtons = new ArrayList<>();
     private boolean busy;
 
-    SkinManagerDialog(Window owner, LauncherConfig cfg, Account account, Path directory,
-                      BiConsumer<BufferedImage, Boolean> previewSink, Runnable accountSkinAction) {
-        super(owner, "Nova Skin Studio", ModalityType.APPLICATION_MODAL);
+    SkinManagerDialog(LauncherConfig cfg, Account account, Path directory, Path modsDirectory, Supplier<String> minecraftVersion,
+                      BiConsumer<BufferedImage, Boolean> previewSink, Runnable accountSkinAction, Runnable closeAction) {
         this.cfg = cfg;
         this.account = account;
         this.directory = directory;
+        this.modsDirectory = modsDirectory;
+        this.minecraftVersion = minecraftVersion;
         this.previewSink = previewSink;
         this.accountSkinAction = accountSkinAction;
+        this.closeAction = closeAction;
         build();
         reload();
-        setMinimumSize(new Dimension(700, 470));
-        setSize(760, 500);
-        setLocationRelativeTo(owner);
+    }
+
+    void setCloseAction(Runnable action) { this.closeAction = action; }
+
+    void lookupOnOpen(String name) {
+        username.setText(name);
+        SwingUtilities.invokeLater(this::lookup);
+    }
+
+    void showModsOnOpen() {
+        SwingUtilities.invokeLater(() -> workspaceLayout.show(workspace, "mods"));
     }
 
     private void build() {
         JPanel root = new JPanel(new BorderLayout(16, 16));
         root.setBorder(new EmptyBorder(18, 20, 16, 20));
         root.setBackground(LauncherApp.BG);
-        setContentPane(root);
+        root.setOpaque(true);
+        setOpaque(false);
+        setLayout(new BorderLayout());
+        add(root, BorderLayout.CENTER);
 
         JPanel header = new JPanel(new BorderLayout(4, 4));
         header.setOpaque(false);
-        JLabel title = LauncherApp.label("Skin Studio", 23, true, LauncherApp.TEXT);
-        JLabel subtitle = LauncherApp.label("Look up, collect, preview, and apply Minecraft skins", 13, false, LauncherApp.MUTED);
+        JLabel title = LauncherApp.label("SKIN LIBRARY", 19, true, LauncherApp.TEXT);
+        JLabel subtitle = LauncherApp.label("Find a look that feels like yours", 13, false, LauncherApp.MUTED);
         header.add(title, BorderLayout.NORTH);
         header.add(subtitle, BorderLayout.SOUTH);
-        root.add(header, BorderLayout.NORTH);
+        JPanel tabs = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        tabs.setOpaque(false);
+        JButton skinsTab = button("Skins");
+        JButton modsTab = button("Mods");
+        skinsTab.addActionListener(e -> workspaceLayout.show(workspace, "skins"));
+        modsTab.addActionListener(e -> { reloadMods(); workspaceLayout.show(workspace, "mods"); });
+        tabs.add(skinsTab);
+        tabs.add(modsTab);
+        JPanel top = new JPanel(new BorderLayout(0, 12));
+        top.setOpaque(false);
+        top.add(header, BorderLayout.NORTH);
+        top.add(tabs, BorderLayout.SOUTH);
+        root.add(top, BorderLayout.NORTH);
 
         JPanel library = new JPanel(new BorderLayout(8, 10));
         library.setOpaque(false);
         JPanel search = new JPanel(new BorderLayout(8, 0));
         search.setOpaque(false);
         username.setFont(LauncherApp.font(Font.PLAIN, 14));
+        username.setForeground(LauncherApp.TEXT);
+        username.setCaretColor(LauncherApp.ACCENT);
+        username.setBackground(LauncherApp.SURFACE);
+        username.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(LauncherApp.BORDER), new EmptyBorder(8, 11, 8, 11)));
         username.setToolTipText("Minecraft Java username");
         search.add(username, BorderLayout.CENTER);
         JButton find = button("Find username");
@@ -75,21 +113,40 @@ final class SkinManagerDialog extends JDialog {
         library.add(search, BorderLayout.NORTH);
 
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        list.setLayoutOrientation(JList.HORIZONTAL_WRAP);
+        list.setVisibleRowCount(1);
+        list.setFixedCellWidth(132);
+        list.setFixedCellHeight(190);
         list.setBackground(LauncherApp.SURFACE);
         list.setForeground(LauncherApp.TEXT);
         list.setSelectionBackground(LauncherApp.ACCENT_DARK);
         list.setFont(LauncherApp.font(Font.PLAIN, 14));
+        list.setFixedCellHeight(44);
         list.setCellRenderer(new DefaultListCellRenderer() {
             @Override public Component getListCellRendererComponent(JList<?> l, Object value, int index, boolean selected, boolean focus) {
                 JLabel c = (JLabel) super.getListCellRendererComponent(l, value, index, selected, focus);
-                c.setBorder(new EmptyBorder(9, 12, 9, 12));
-                if (cfg.selectedSkin.equals(value)) c.setText("★   " + value + "   · selected");
+                c.setBorder(new EmptyBorder(8, 8, 8, 8));
+                c.setOpaque(true);
+                c.setBackground(selected ? LauncherApp.SURFACE2 : LauncherApp.SURFACE);
+                c.setForeground(selected ? LauncherApp.TEXT : LauncherApp.MUTED);
+                if (value != null) {
+                    String name = value.toString();
+                    Path skinFile = skinPath(name);
+                    try {
+                        BufferedImage skinImage = skinFile == null ? null : ImageIO.read(skinFile.toFile());
+                        if (validSkin(skinImage)) c.setIcon(new ImageIcon(carouselSprite(skinImage, cfg.skinSlim.getOrDefault(name, false))));
+                    } catch (Exception ignored) {}
+                    c.setHorizontalTextPosition(SwingConstants.CENTER);
+                    c.setVerticalTextPosition(SwingConstants.BOTTOM);
+                    c.setText(cfg.selectedSkin.equals(name) ? "✦  " + name : name);
+                }
                 return c;
             }
         });
         list.addListSelectionListener(e -> showSelected());
-        JScrollPane scroll = new JScrollPane(list);
+        JScrollPane scroll = new JScrollPane(list, ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         scroll.setBorder(BorderFactory.createLineBorder(LauncherApp.BORDER));
+        scroll.getViewport().setBackground(LauncherApp.SURFACE);
         library.add(scroll, BorderLayout.CENTER);
 
         JPanel leftButtons = new JPanel(new GridLayout(1, 2, 8, 0));
@@ -101,7 +158,10 @@ final class SkinManagerDialog extends JDialog {
         leftButtons.add(importButton);
         leftButtons.add(removeButton);
         library.add(leftButtons, BorderLayout.SOUTH);
-        root.add(library, BorderLayout.CENTER);
+        workspace.setOpaque(false);
+        workspace.add(library, "skins");
+        workspace.add(buildModsPanel(), "mods");
+        root.add(workspace, BorderLayout.CENTER);
 
         JPanel right = new JPanel(new BorderLayout(8, 12));
         right.setOpaque(false);
@@ -109,7 +169,7 @@ final class SkinManagerDialog extends JDialog {
         preview.setPreferredSize(new Dimension(220, 285));
         preview.setOpaque(true);
         preview.setBackground(LauncherApp.SURFACE);
-        preview.setBorder(BorderFactory.createLineBorder(LauncherApp.BORDER));
+        preview.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(LauncherApp.BORDER), new EmptyBorder(12, 12, 12, 12)));
         preview.setText("Choose a skin to preview");
         preview.setForeground(LauncherApp.MUTED);
         right.add(preview, BorderLayout.CENTER);
@@ -118,9 +178,6 @@ final class SkinManagerDialog extends JDialog {
         actions.setOpaque(false);
         applyButton.addActionListener(e -> useSelected());
         actions.add(applyButton);
-        JButton accountDefault = button("Use signed-in skin");
-        accountDefault.addActionListener(e -> useAccountSkin());
-        actions.add(accountDefault);
         uploadButton.addActionListener(e -> uploadSelected());
         actions.add(uploadButton);
         status.setForeground(LauncherApp.MUTED);
@@ -130,12 +187,20 @@ final class SkinManagerDialog extends JDialog {
         right.add(actions, BorderLayout.SOUTH);
         root.add(right, BorderLayout.EAST);
 
-        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+        JPanel footer = new JPanel(new BorderLayout());
+        footer.setOpaque(false);
+        JButton close = button("Back to launcher");
+        close.addActionListener(e -> { if (closeAction != null) closeAction.run(); });
+        footer.add(close, BorderLayout.EAST);
+        root.add(footer, BorderLayout.SOUTH);
+        setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(LauncherApp.alpha(LauncherApp.ACCENT, 150)), new EmptyBorder(1, 1, 1, 1)));
+        registerKeyboardAction(e -> { if (closeAction != null) closeAction.run(); }, KeyStroke.getKeyStroke("ESCAPE"), JComponent.WHEN_IN_FOCUSED_WINDOW);
     }
 
     private JButton button(String text) {
         JButton b = new LauncherApp.NovaButton(text, false);
         b.setPreferredSize(new Dimension(140, 38));
+        actionButtons.add(b);
         return b;
     }
 
@@ -164,6 +229,87 @@ final class SkinManagerDialog extends JDialog {
         Path base = directory.toAbsolutePath().normalize();
         Path file = base.resolve(name).normalize();
         return file.getParent() != null && file.getParent().equals(base) ? file : null;
+    }
+
+    private JPanel buildModsPanel() {
+        JPanel panel = new JPanel(new BorderLayout(12, 12));
+        panel.setOpaque(false);
+        modList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        modList.setBackground(LauncherApp.SURFACE);
+        modList.setForeground(LauncherApp.TEXT);
+        modList.setSelectionBackground(LauncherApp.ACCENT_DARK);
+        modList.setFont(LauncherApp.font(Font.PLAIN, 14));
+        modList.setFixedCellHeight(42);
+        JScrollPane scroll = new JScrollPane(modList);
+        scroll.setBorder(BorderFactory.createLineBorder(LauncherApp.BORDER));
+        scroll.getViewport().setBackground(LauncherApp.SURFACE);
+        panel.add(scroll, BorderLayout.CENTER);
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        buttons.setOpaque(false);
+        JButton toggle = button("Toggle selected");
+        toggle.addActionListener(e -> toggleSelectedMod());
+        JButton importMod = button("Import .jar");
+        importMod.addActionListener(e -> importMod());
+        JButton removeMod = button("Remove selected");
+        removeMod.addActionListener(e -> removeSelectedMod());
+        JButton optional = button("Sodium / Iris / Freecam");
+        optional.addActionListener(e -> setStatus("Optional mods can be managed from the launcher’s Mods controls.", LauncherApp.MUTED));
+        buttons.add(toggle); buttons.add(importMod); buttons.add(removeMod); buttons.add(optional);
+        panel.add(buttons, BorderLayout.SOUTH);
+        return panel;
+    }
+
+    private void reloadMods() {
+        modModel.clear();
+        try {
+            Files.createDirectories(modsDirectory);
+            try (java.util.stream.Stream<Path> files = Files.list(modsDirectory)) {
+                files.filter(p -> p.getFileName().toString().endsWith(".jar") || p.getFileName().toString().endsWith(".jar.disabled"))
+                        .sorted().forEach(p -> {
+                            String name = p.getFileName().toString();
+                            modModel.addElement((name.endsWith(".disabled") ? "○  " : "●  ") + name);
+                        });
+            }
+        } catch (IOException e) { setStatus("Could not read mods folder: " + e.getMessage(), LauncherApp.RED); }
+    }
+
+    private Path selectedMod() {
+        int index = modList.getSelectedIndex();
+        if (index < 0) return null;
+        String text = modModel.get(index).substring(3);
+        return modsDirectory.resolve(text);
+    }
+
+    private void toggleSelectedMod() {
+        Path selected = selectedMod();
+        if (selected == null) { setStatus("Choose a mod first.", LauncherApp.RED); return; }
+        String name = selected.getFileName().toString();
+        boolean enabled = name.endsWith(".disabled");
+        String base = enabled ? name.substring(0, name.length() - ".disabled".length()) : name;
+        try {
+            Files.move(selected, modsDirectory.resolve(enabled ? base : base + ".disabled"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            reloadMods();
+        } catch (IOException e) { setStatus("Could not toggle mod: " + e.getMessage(), LauncherApp.RED); }
+    }
+
+    private void importMod() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setMultiSelectionEnabled(true);
+        chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Fabric mods (*.jar)", "jar"));
+        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        try {
+            Files.createDirectories(modsDirectory);
+            for (java.io.File file : chooser.getSelectedFiles()) if (file.getName().toLowerCase().endsWith(".jar"))
+                Files.copy(file.toPath(), modsDirectory.resolve(file.getName()), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            reloadMods();
+        } catch (IOException e) { setStatus("Could not import mod: " + e.getMessage(), LauncherApp.RED); }
+    }
+
+    private void removeSelectedMod() {
+        Path selected = selectedMod();
+        if (selected == null) { setStatus("Choose a mod first.", LauncherApp.RED); return; }
+        try { Files.deleteIfExists(selected); reloadMods(); }
+        catch (IOException e) { setStatus("Could not remove mod: " + e.getMessage(), LauncherApp.RED); }
     }
 
     private void lookup() {
@@ -230,6 +376,24 @@ final class SkinManagerDialog extends JDialog {
         });
     }
 
+    private static BufferedImage carouselSprite(BufferedImage skin, boolean slim) {
+        BufferedImage body = SkinRenderer.toImage(SkinRenderer.front(skin, slim), 8);
+        BufferedImage sprite = new BufferedImage(144, 196, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = sprite.createGraphics();
+        LauncherApp.aa(g);
+        g.setPaint(new RadialGradientPaint(72, 158, 66, new float[]{0f, 1f}, new Color[]{new Color(LauncherApp.ACCENT.getRed(), LauncherApp.ACCENT.getGreen(), LauncherApp.ACCENT.getBlue(), 90), new Color(0, 0, 0, 0)}));
+        g.fillOval(4, 85, 136, 110);
+        g.setColor(new Color(255, 255, 255, 32));
+        g.fillOval(43, 164, 58, 9);
+        g.setColor(LauncherApp.alpha(LauncherApp.ACCENT, 170));
+        g.setStroke(new BasicStroke(1.2f));
+        g.drawOval(28, 8, 88, 172);
+        g.rotate(-0.12, 72, 100);
+        g.drawImage(body, 8, 24, 128, 152, null);
+        g.dispose();
+        return sprite;
+    }
+
     private void showSelected() {
         String name = list.getSelectedValue();
         if (name == null) { preview.setIcon(null); preview.setText("Choose a skin to preview"); return; }
@@ -237,11 +401,8 @@ final class SkinManagerDialog extends JDialog {
         try {
             BufferedImage image = file == null ? null : ImageIO.read(file.toFile());
             if (!validSkin(image)) throw new IOException("Invalid skin image.");
-            int[] pixels = SkinRenderer.front(image, cfg.skinSlim.getOrDefault(name, false));
-            BufferedImage rendered = SkinRenderer.toImage(pixels, 6);
-            Image scaled = rendered.getScaledInstance(180, 300, Image.SCALE_DEFAULT);
             preview.setText("");
-            preview.setIcon(new ImageIcon(scaled));
+            preview.setIcon(new ImageIcon(carouselSprite(image, cfg.skinSlim.getOrDefault(name, false))));
         } catch (Exception e) {
             preview.setIcon(null);
             preview.setText("Preview unavailable");
@@ -255,10 +416,18 @@ final class SkinManagerDialog extends JDialog {
         try {
             BufferedImage image = ImageIO.read(file.toFile());
             if (!validSkin(image)) throw new IOException("Invalid skin image.");
-            cfg.selectedSkin = name;
-            cfg.save();
-            previewSink.accept(image, cfg.skinSlim.getOrDefault(name, false));
-            setStatus("Selected skin for the launcher preview. Use Apply to Minecraft account to change your account skin.", LauncherApp.GREEN);
+            if (name.equals(cfg.selectedSkin)) {
+                cfg.selectedSkin = "";
+                cfg.save();
+                accountSkinAction.run();
+                setStatus("Back to your signed-in Minecraft skin.", LauncherApp.GREEN);
+            } else {
+                cfg.selectedSkin = name;
+                cfg.save();
+                previewSink.accept(image, cfg.skinSlim.getOrDefault(name, false));
+                setStatus("Selected for the launcher preview. Apply it to your Minecraft account when ready.", LauncherApp.GREEN);
+            }
+            list.repaint();
         } catch (Exception e) { setStatus(e.getMessage(), LauncherApp.RED); }
     }
 
@@ -348,9 +517,10 @@ final class SkinManagerDialog extends JDialog {
     }
 
     private void setEnabledActions(boolean enabled) {
-        for (Component c : getContentPane().getComponents()) c.setEnabled(enabled);
+        for (JButton button : actionButtons) button.setEnabled(enabled);
         applyButton.setEnabled(enabled);
         uploadButton.setEnabled(enabled && account != null && account.online);
+        username.setEnabled(enabled);
     }
 
     private void setStatus(String text, Color color) {

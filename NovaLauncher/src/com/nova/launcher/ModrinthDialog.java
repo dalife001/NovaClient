@@ -20,8 +20,8 @@ import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 
 /**
- * Get mods, resource packs and shaders from Modrinth. Type to search, press Install on a row, done:
- * no selecting, no extra windows. More results load by themselves as you scroll.
+ * Browse compatible mods, resource packs and shaders from Modrinth, inspect details, then install.
+ * More results load automatically as you scroll.
  */
 final class ModrinthDialog extends JDialog {
     private static final int PAGE = 20, ICON = 56;
@@ -270,10 +270,23 @@ final class ModrinthDialog extends JDialog {
             text.add(desc);
 
             action.addActionListener(e -> toggle());
-            JPanel east = new JPanel(new GridBagLayout());
+            LauncherApp.NovaButton details = new LauncherApp.NovaButton("Details", false);
+            details.addActionListener(e -> showDetails(hit, this));
+            JPanel east = new JPanel(new GridLayout(2, 1, 0, 5));
             east.setOpaque(false);
+            east.add(details);
             east.add(action);
+            setToolTipText("Inspect this project on Modrinth before installing.");
 
+            java.awt.event.MouseAdapter openDetails = new java.awt.event.MouseAdapter() {
+                @Override public void mouseClicked(java.awt.event.MouseEvent e) { Platform.open(Modrinth.pageUrl(hit)); }
+                @Override public void mouseEntered(java.awt.event.MouseEvent e) { setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)); }
+                @Override public void mouseExited(java.awt.event.MouseEvent e) { setCursor(Cursor.getDefaultCursor()); }
+            };
+            iconBox.addMouseListener(openDetails);
+            name.addMouseListener(openDetails);
+            meta.addMouseListener(openDetails);
+            desc.addMouseListener(openDetails);
             add(iconBox, BorderLayout.WEST);
             add(text, BorderLayout.CENTER);
             add(east, BorderLayout.EAST);
@@ -346,6 +359,48 @@ final class ModrinthDialog extends JDialog {
                 g.drawString(letter, (w - fm.stringWidth(letter)) / 2, (h + fm.getAscent() - fm.getDescent()) / 2);
             }
         }
+    }
+
+    private void showDetails(Modrinth.Hit hit, Component parent) {
+        JDialog details = new JDialog(this, hit.title(), Dialog.ModalityType.APPLICATION_MODAL);
+        JPanel panel = new JPanel(new BorderLayout(0, 12));
+        panel.setBackground(LauncherApp.BG);
+        panel.setBorder(new EmptyBorder(20, 22, 18, 22));
+
+        JLabel title = LauncherApp.label(hit.title(), 20, true, LauncherApp.TEXT);
+        JLabel meta = LauncherApp.label("by " + hit.author() + "  ?  " + count(hit.downloads()) + " downloads", 12, false, LauncherApp.MUTED);
+        JTextArea description = new JTextArea(hit.description());
+        description.setEditable(false);
+        description.setLineWrap(true);
+        description.setWrapStyleWord(true);
+        description.setOpaque(false);
+        description.setForeground(LauncherApp.TEXT);
+        description.setFont(LauncherApp.font(Font.PLAIN, 14));
+        description.setCaretPosition(0);
+        JPanel heading = new JPanel(new GridLayout(2, 1, 0, 3));
+        heading.setOpaque(false);
+        heading.add(title);
+        heading.add(meta);
+        panel.add(heading, BorderLayout.NORTH);
+        JScrollPane textScroll = new JScrollPane(description);
+        textScroll.setBorder(BorderFactory.createLineBorder(LauncherApp.BORDER));
+        textScroll.getViewport().setBackground(LauncherApp.SURFACE);
+        panel.add(textScroll, BorderLayout.CENTER);
+
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        actions.setOpaque(false);
+        LauncherApp.NovaButton web = new LauncherApp.NovaButton("Modrinth page", false);
+        web.addActionListener(e -> Platform.open(Modrinth.pageUrl(hit)));
+        LauncherApp.NovaButton install = new LauncherApp.NovaButton("Install", true);
+        install.addActionListener(e -> { details.dispose(); Row row = rowById.get(hit.id()); if (row != null) row.toggle(); });
+        LauncherApp.NovaButton close = new LauncherApp.NovaButton("Back", false);
+        close.addActionListener(e -> details.dispose());
+        actions.add(web); actions.add(close); actions.add(install);
+        panel.add(actions, BorderLayout.SOUTH);
+        details.setContentPane(panel);
+        details.setSize(540, 360);
+        details.setLocationRelativeTo(parent);
+        details.setVisible(true);
     }
 
     static String count(long n) {
