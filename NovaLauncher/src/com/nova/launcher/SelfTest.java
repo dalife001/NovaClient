@@ -349,6 +349,51 @@ public final class SelfTest {
 
         System.out.println("info: built-in mod = " + (Embedded.load() == null ? "none (dev build)" : Embedded.load().version));
 
+        Embedded embedded = Embedded.load();
+        if (embedded != null) {
+            boolean validEmbeddedJar = false;
+            try (java.io.InputStream in = embedded.jar(); java.util.jar.JarInputStream jar = new java.util.jar.JarInputStream(in)) {
+                java.util.jar.JarEntry entry;
+                while ((entry = jar.getNextJarEntry()) != null) {
+                    if (entry.getName().equals("fabric.mod.json")) { validEmbeddedJar = true; break; }
+                }
+            }
+            check("embedded client: default resource contains Fabric metadata", validEmbeddedJar);
+            boolean valid26Jar = false;
+            if (embedded.supports("26.1")) {
+                try (java.io.InputStream in = embedded.jar("26.1"); java.util.jar.JarInputStream jar = new java.util.jar.JarInputStream(in)) {
+                    java.util.jar.JarEntry entry;
+                    while ((entry = jar.getNextJarEntry()) != null) {
+                        if (entry.getName().equals("fabric.mod.json")) { valid26Jar = true; break; }
+                    }
+                }
+            }
+            check("embedded client: Minecraft 26.1 resource contains Fabric metadata", valid26Jar);
+            Path embeddedMods = tmp.resolve("embedded-mods");
+            java.nio.file.Files.createDirectories(embeddedMods);
+            try {
+                NovaUpdater.Pick pick = NovaUpdater.installNova(new LauncherConfig(), null, embedded,
+                        embedded.minecraft, embeddedMods, quiet);
+                boolean installed;
+                try (java.util.stream.Stream<Path> files = java.nio.file.Files.list(embeddedMods)) {
+                    installed = files.anyMatch(f -> f.getFileName().toString().startsWith("novaclient-")
+                            && f.getFileName().toString().endsWith(".jar"));
+                }
+                check("Play preparation: matching embedded client is installed", pick.loaded() && installed);
+            } catch (Exception e) {
+                check("Play preparation: matching embedded client is installed", false);
+            }
+        }
+        try {
+            String javaName = Platform.os().equals("windows") ? "java.exe" : "java";
+            Path javaExecutable = Path.of(System.getProperty("java.home"), "bin", javaName);
+            Process smoke = GameLauncher.start(List.of(javaExecutable.toString(), "-version"), tmp.resolve("launch-smoke"));
+            smoke.getInputStream().transferTo(java.io.OutputStream.nullOutputStream());
+            check("Play process: Java starts from the configured game directory", smoke.waitFor() == 0);
+        } catch (Exception e) {
+            check("Play process: Java starts from the configured game directory", false);
+        }
+
         System.out.println(fails == 0 ? "\nALL TESTS PASSED" : "\n" + fails + " TEST(S) FAILED");
         System.exit(fails == 0 ? 0 : 1);
     }

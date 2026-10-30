@@ -105,6 +105,13 @@ if not exist dist mkdir dist
 copy /Y NovaLauncher\NovaLauncher.jar dist\NovaLauncher.jar >nul
 copy /Y NovaLauncher\NovaLauncher.jar NovaLauncher.jar >nul
 
+rem Run the same offline launcher self-tests as .github/workflows/test.yml.
+echo.
+echo ===== Verifying launcher and embedded client =====
+java -cp NovaLauncher\NovaLauncher.jar com.nova.launcher.SelfTest
+if errorlevel 1 ( echo Launcher self-tests failed. & exit /b 1 )
+if not exist "dist\NovaLauncher.jar" ( echo Runnable launcher jar is missing from dist. & exit /b 1 )
+
 rem ---- [4/4] Package Windows app ----
 echo.
 echo ===== [4/4] Making NovaLauncher.exe =====

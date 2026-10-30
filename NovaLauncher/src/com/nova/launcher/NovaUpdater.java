@@ -113,11 +113,7 @@ final class NovaUpdater {
 
         Pick pick = installNova(cfg, man, emb, mc, mods, p);
 
-        // Sodium / Iris / Freecam: whatever the player ticked, for this Minecraft version.
-        OptionalMods.sync(cfg, mc, mods, p);
-
         // Fabric refuses to start if any mod needs another Minecraft version, so switch those off first.
-        // Sodium / Iris / Freecam: exactly what the player ticked, for this Minecraft version
         OptionalMods.sync(cfg, mc, mods, p);
         for (String line : ModScan.disableIncompatible(mods, mc)) p.status(line);
         boolean loaded = pick.loaded() && ModScan.novaEnabled(mods);

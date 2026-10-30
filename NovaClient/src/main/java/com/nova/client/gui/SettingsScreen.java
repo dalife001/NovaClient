@@ -16,7 +16,7 @@ public class SettingsScreen extends NovaScreen {
     public SettingsScreen(Screen parent) { super("Settings", parent); }
 
     private int px() { return width / 2 - W / 2; }
-    private int py() { return Math.max(14, height / 2 - 115); }
+    private int py() { return Math.max(14, height / 2 - 123); }
 
     @Override
     protected void build() {
@@ -67,7 +67,7 @@ public class SettingsScreen extends NovaScreen {
 
     @Override
     protected void drawBack(Gfx ctx, int mx, int my, float delta) {
-        Ui.card(ctx, px(), py(), W, 182);
+        Ui.card(ctx, px(), py(), W, 252);
         Ui.headerBand(ctx, px(), py(), W);
     }
 
@@ -80,8 +80,8 @@ public class SettingsScreen extends NovaScreen {
         String line = UpdateChecker.available()
                 ? "Update available: " + UpdateChecker.latest + " (you have " + NovaClient.VERSION + ")"
                 : "Version " + NovaClient.VERSION + " - " + UpdateChecker.note;
-        ctx.drawTextWithShadow(textRenderer, textRenderer.trimToWidth(line, W - 40), px() + 20, py() + 176 - 4,
+        ctx.drawTextWithShadow(textRenderer, textRenderer.trimToWidth(line, W - 40), px() + 20, py() + 184,
                 UpdateChecker.available() ? Ui.GREEN : Ui.MUTED);
-        if (!status.isEmpty()) ctx.drawCenteredTextWithShadow(textRenderer, status, cx, py() + 224, Ui.GREEN);
+        if (!status.isEmpty()) ctx.drawCenteredTextWithShadow(textRenderer, status, cx, py() + 238, Ui.GREEN);
     }
 }

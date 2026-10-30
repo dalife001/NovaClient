@@ -84,23 +84,31 @@ final class ModrinthDialog extends JDialog {
         query.putClientProperty("JTextField.placeholderText", "Search Modrinth...");
         debounce = new javax.swing.Timer(350, e -> search(true));
         debounce.setRepeats(false);
+        query.addActionListener(e -> { debounce.stop(); search(true); });
+        LauncherApp.NovaButton searchButton = new LauncherApp.NovaButton("Search", true);
+        searchButton.addActionListener(e -> { debounce.stop(); search(true); });
         query.getDocument().addDocumentListener(new DocumentListener() {
             public void insertUpdate(DocumentEvent e) { debounce.restart(); }
             public void removeUpdate(DocumentEvent e) { debounce.restart(); }
             public void changedUpdate(DocumentEvent e) { debounce.restart(); }
         });
 
+        JPanel searchRow = new JPanel(new BorderLayout(8, 0));
+        searchRow.setOpaque(false);
+        searchRow.add(query, BorderLayout.CENTER);
+        searchRow.add(searchButton, BorderLayout.EAST);
+
         JPanel top = new JPanel();
         top.setOpaque(false);
         top.setLayout(new BoxLayout(top, BoxLayout.Y_AXIS));
-        for (JComponent c : new JComponent[]{title, sub, tabsAndSort, query}) c.setAlignmentX(LEFT_ALIGNMENT);
+        for (JComponent c : new JComponent[]{title, sub, tabsAndSort, searchRow}) c.setAlignmentX(LEFT_ALIGNMENT);
         top.add(title);
         top.add(Box.createVerticalStrut(2));
         top.add(sub);
         top.add(Box.createVerticalStrut(14));
         top.add(tabsAndSort);
         top.add(Box.createVerticalStrut(10));
-        top.add(query);
+        top.add(searchRow);
 
         // ---- the results
         rows.setLayout(new BoxLayout(rows, BoxLayout.Y_AXIS));

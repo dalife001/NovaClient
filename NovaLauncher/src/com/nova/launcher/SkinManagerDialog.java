@@ -36,7 +36,7 @@ final class SkinManagerDialog extends JPanel {
     private final JPanel workspace = new JPanel(workspaceLayout);
     private final JTextField username = new JTextField();
     private final JLabel status = new JLabel("Find a username or import a skin PNG. Saved skins stay on this computer.");
-    private final JLabel preview = new JLabel("", SwingConstants.CENTER);
+    private final SkinPreview preview = new SkinPreview();
     private final JButton applyButton = new JButton("Use in launcher");
     private final JButton uploadButton = new JButton("Apply to Minecraft account");
     private final List<JButton> actionButtons = new ArrayList<>();
@@ -115,13 +115,12 @@ final class SkinManagerDialog extends JPanel {
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         list.setLayoutOrientation(JList.HORIZONTAL_WRAP);
         list.setVisibleRowCount(1);
-        list.setFixedCellWidth(132);
+        list.setFixedCellWidth(148);
         list.setFixedCellHeight(190);
         list.setBackground(LauncherApp.SURFACE);
         list.setForeground(LauncherApp.TEXT);
         list.setSelectionBackground(LauncherApp.ACCENT_DARK);
         list.setFont(LauncherApp.font(Font.PLAIN, 14));
-        list.setFixedCellHeight(44);
         list.setCellRenderer(new DefaultListCellRenderer() {
             @Override public Component getListCellRendererComponent(JList<?> l, Object value, int index, boolean selected, boolean focus) {
                 JLabel c = (JLabel) super.getListCellRendererComponent(l, value, index, selected, focus);
@@ -388,7 +387,6 @@ final class SkinManagerDialog extends JPanel {
         g.setColor(LauncherApp.alpha(LauncherApp.ACCENT, 170));
         g.setStroke(new BasicStroke(1.2f));
         g.drawOval(28, 8, 88, 172);
-        g.rotate(-0.12, 72, 100);
         g.drawImage(body, 8, 24, 128, 152, null);
         g.dispose();
         return sprite;
@@ -494,6 +492,56 @@ final class SkinManagerDialog extends JPanel {
             preview.setText("Choose a skin to preview");
             setStatus("Removed saved skin.", LauncherApp.MUTED);
         } catch (IOException e) { setStatus("Could not remove skin: " + e.getMessage(), LauncherApp.RED); }
+    }
+
+    /** Interactive front-facing skin preview: left drag rotates, right/middle drag pans, wheel zooms. */
+    private static final class SkinPreview extends JLabel {
+        private double rotation, zoom = 1.0, panX, panY;
+        private int lastX, lastY, dragButton;
+
+        SkinPreview() {
+            super("Choose a skin to preview", SwingConstants.CENTER);
+            setOpaque(true);
+            setBackground(LauncherApp.SURFACE);
+            setForeground(LauncherApp.MUTED);
+            setToolTipText("Drag to rotate or pan; use the mouse wheel to zoom");
+            java.awt.event.MouseAdapter controls = new java.awt.event.MouseAdapter() {
+                @Override public void mousePressed(java.awt.event.MouseEvent e) {
+                    lastX = e.getX(); lastY = e.getY(); dragButton = e.getButton();
+                }
+                @Override public void mouseReleased(java.awt.event.MouseEvent e) { dragButton = 0; }
+                @Override public void mouseDragged(java.awt.event.MouseEvent e) {
+                    int dx = e.getX() - lastX, dy = e.getY() - lastY;
+                    if (dragButton == java.awt.event.MouseEvent.BUTTON1) rotation += dx * 0.012;
+                    else if (dragButton == java.awt.event.MouseEvent.BUTTON2 || dragButton == java.awt.event.MouseEvent.BUTTON3) {
+                        panX += dx; panY += dy;
+                    }
+                    lastX = e.getX(); lastY = e.getY(); repaint();
+                }
+                @Override public void mouseWheelMoved(java.awt.event.MouseWheelEvent e) {
+                    zoom = Math.max(0.55, Math.min(2.5, zoom * Math.pow(1.12, -e.getPreciseWheelRotation())));
+                    repaint();
+                }
+            };
+            addMouseListener(controls);
+            addMouseMotionListener(controls);
+            addMouseWheelListener(controls);
+        }
+
+        @Override protected void paintComponent(Graphics graphics) {
+            Icon icon = getIcon();
+            if (!(icon instanceof ImageIcon imageIcon)) { super.paintComponent(graphics); return; }
+            Graphics2D g = (Graphics2D) graphics.create();
+            LauncherApp.aa(g);
+            g.setColor(getBackground());
+            g.fillRect(0, 0, getWidth(), getHeight());
+            g.translate(getWidth() / 2.0 + panX, getHeight() / 2.0 + panY);
+            g.rotate(rotation);
+            g.scale(zoom, zoom);
+            Image image = imageIcon.getImage();
+            g.drawImage(image, -image.getWidth(null) / 2, -image.getHeight(null) / 2, null);
+            g.dispose();
+        }
     }
 
     private void runBusy(String message, ThrowingRunnable action) {
