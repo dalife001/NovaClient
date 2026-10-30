@@ -152,7 +152,7 @@ public final class LauncherApp {
         orbit.onLogin = this::toggleLogin;
         orbit.onSettings = this::openSettings;
         orbit.onTheme = this::nextTheme;
-        orbit.onSkin = this::previewSkinFile;
+        orbit.onSkin = this::openSkinManager;
         orbit.onVersion = this::openVersions;
         orbit.onMods = this::openMods;
         orbit.onOfficial = this::addToOfficial;
@@ -164,6 +164,7 @@ public final class LauncherApp {
         orbit.onMin = () -> { if (frame != null) frame.setState(Frame.ICONIFIED); };
         orbit.onClose = () -> System.exit(0);
         orbit.setSkin(null, false);
+        applySavedSkin();
     }
 
     /** The Minecraft version shown (and played): the picked one, or whatever "automatic" resolves to. */
@@ -312,6 +313,7 @@ public final class LauncherApp {
             orbit.who = "Not logged in";
             orbit.loginText = "sign in";
             orbit.setSkin(null, false);
+            applySavedSkin();
             return;
         }
         if (cfg.azureClientId.isBlank()) {
@@ -346,24 +348,68 @@ public final class LauncherApp {
             orbit.who = a.name;
             orbit.loggedIn = true;
             orbit.loginText = "log out";
-            orbit.setSkin(fs, a.slim);
+            applySavedOrAccountSkin(a, fs);
         });
         setStatus("Logged in as " + a.name);
         log("Logged in as " + a.name);
     }
 
-    private void previewSkinFile() {
-        JFileChooser fc = new JFileChooser();
-        fc.setDialogTitle("Choose a skin PNG");
-        if (fc.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) {
-            try {
-                BufferedImage img = ImageIO.read(fc.getSelectedFile());
-                if (img == null) throw new Exception("not an image");
-                orbit.setSkin(img, false);
-            } catch (Exception e) {
-                JOptionPane.showMessageDialog(frame, "Could not read that file: " + e.getMessage());
-            }
+    private Path skinDirectory() { return home.resolve("skins"); }
+
+    private void openSkinManager() {
+        new SkinManagerDialog(frame, cfg, account, skinDirectory(), orbit::setSkin, this::useAccountSkin).setVisible(true);
+    }
+
+    private void applySavedSkin() {
+        if (cfg.selectedSkin == null || cfg.selectedSkin.isBlank()) return;
+        Path dir = skinDirectory().toAbsolutePath().normalize();
+        Path skin = dir.resolve(cfg.selectedSkin).normalize();
+        if (!dir.equals(skin.getParent()) || !Files.isRegularFile(skin)) {
+            cfg.selectedSkin = "";
+            cfg.save();
+            return;
         }
+        try {
+            BufferedImage image = ImageIO.read(skin.toFile());
+            if (image != null) orbit.setSkin(image, false);
+        } catch (Exception e) { log("Could not load selected skin: " + e.getMessage()); }
+    }
+
+    private void applySavedOrAccountSkin(Account acct, BufferedImage accountSkin) {
+        String selected = cfg.selectedSkin;
+        if (selected != null && !selected.isBlank()) {
+            Path dir = skinDirectory().toAbsolutePath().normalize();
+            Path skin = dir.resolve(selected).normalize();
+            if (dir.equals(skin.getParent()) && Files.isRegularFile(skin)) {
+                try {
+                    BufferedImage custom = ImageIO.read(skin.toFile());
+                    if (custom != null) { orbit.setSkin(custom, false); return; }
+                } catch (Exception e) { log("Could not load selected skin: " + e.getMessage()); }
+            }
+            cfg.selectedSkin = "";
+            cfg.save();
+        }
+        orbit.setSkin(accountSkin, acct != null && acct.slim);
+    }
+
+    private void useAccountSkin() {
+        cfg.selectedSkin = "";
+        cfg.save();
+        Account current = account;
+        if (current == null || !current.online) {
+            orbit.setSkin(null, false);
+            orbit.status = "Sign in to show your Minecraft account skin";
+            return;
+        }
+        async(() -> {
+            BufferedImage skin = null;
+            if (current.skinUrl != null) {
+                try { skin = ImageIO.read(new ByteArrayInputStream(Http.getBytes(current.skinUrl))); }
+                catch (Exception e) { log("Could not load account skin: " + e.getMessage()); }
+            }
+            BufferedImage active = skin;
+            SwingUtilities.invokeLater(() -> orbit.setSkin(active, current.slim));
+        });
     }
 
     // ------------------------------------------------------------------ play

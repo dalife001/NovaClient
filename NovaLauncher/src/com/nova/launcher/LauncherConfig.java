@@ -2,7 +2,9 @@ package com.nova.launcher;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /** Saved in launcher.json inside the launcher folder. Contains a login token: keep it private. */
@@ -23,7 +25,7 @@ final class LauncherConfig {
     String backgroundPath = "";
     String javaPath = "";
     int ramMb = 4096;
-    /** Colour palette index (0 Nova, 1 Ocean, 2 Sunset, 3 Emerald, 4 Rose). Shared with the game. */
+    /** Colour palette index (0 Nova, 1 Ocean, 2 Dusk, 3 Meadow, 4 Blossom). Shared with the game. */
     int theme = 0;
     /** Load the Nova Client mod. Off = plain Fabric (useful to check a version without Nova). */
     boolean useNova = true;
@@ -31,6 +33,12 @@ final class LauncherConfig {
     String optionalMods = "";
     /** True once the player has seen the "Choose your mods" window. */
     boolean optionalChosen = false;
+    /** Skin PNG filenames saved in the launcher-managed skins folder; there is no item limit. */
+    List<String> savedSkins = new ArrayList<>();
+    /** Selected custom skin filename; blank means use the signed-in account's active skin. */
+    String selectedSkin = "";
+    /** Per-skin player model: true for slim arms, false for classic arms. */
+    Map<String, Boolean> skinSlim = new LinkedHashMap<>();
 
     static Path file() { return Platform.home().resolve("launcher.json"); }
 
@@ -55,6 +63,18 @@ final class LauncherConfig {
                 if (m.get("useNova") instanceof Boolean ub) c.useNova = ub;
                 c.optionalMods = s(m, "optionalMods", c.optionalMods);
                 if (m.get("optionalChosen") instanceof Boolean oc) c.optionalChosen = oc;
+                c.selectedSkin = s(m, "selectedSkin", c.selectedSkin);
+                Map<String, Object> models = Json.o(m.get("skinSlim"));
+                if (models != null) {
+                    c.skinSlim = new LinkedHashMap<>();
+                    for (Map.Entry<String, Object> entry : models.entrySet())
+                        if (entry.getValue() instanceof Boolean slim) c.skinSlim.put(entry.getKey(), slim);
+                }
+                List<Object> skins = Json.a(m.get("savedSkins"));
+                if (skins != null) {
+                    c.savedSkins = new ArrayList<>();
+                    for (Object skin : skins) if (skin instanceof String name && !name.isBlank()) c.savedSkins.add(name);
+                }
             }
         } catch (Exception ignored) {}
         return c;
@@ -82,6 +102,9 @@ final class LauncherConfig {
             m.put("useNova", useNova);
             m.put("optionalMods", optionalMods);
             m.put("optionalChosen", optionalChosen);
+            m.put("savedSkins", new ArrayList<>(savedSkins));
+            m.put("selectedSkin", selectedSkin);
+            m.put("skinSlim", new LinkedHashMap<>(skinSlim));
             Files.writeString(file(), Json.write(m));
         } catch (Exception e) {
             e.printStackTrace();

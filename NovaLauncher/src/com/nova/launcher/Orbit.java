@@ -544,7 +544,7 @@ final class Orbit extends JComponent {
 
     private void paintDock(Graphics2D g2, int w, int h, float dt) {
         String[] ids = {"console", "skin", "folder", "mods", "add", "theme", "settings"};
-        String[] tips = {"Console", "Preview a skin file", "Game folder", "Mods", "Add to Minecraft Launcher", "Theme \u00B7 " + themeName, "Settings"};
+        String[] tips = {"Console", "Manage skins", "Game folder", "Mods", "Add to Minecraft Launcher", "Theme \u00B7 " + themeName, "Settings"};
         Glyph[] gl = {Glyph.TERMINAL, Glyph.SHIRT, Glyph.FOLDER, Glyph.BOX, Glyph.PLUS, Glyph.PALETTE, Glyph.GEAR};
         Runnable[] acts = {this::toggleConsole, onSkin, onFolder, onMods, onOfficial, onTheme, onSettings};
         double base = 42, gapPx = 12;
