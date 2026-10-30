@@ -1,170 +1,258 @@
-# Nova (client + launcher)
+# Nova
 
+> A quieter way to play.
+
+Nova is a custom Minecraft client with a matching launcher, animated menus, modular HUD tools, account support, and automatic version-aware installation. It is built around Fabric and organized as a small ecosystem rather than a single mod jar.
+
+## At a glance
+
+| Area | Current state |
+| --- | --- |
+| Main client | Minecraft `1.21.4`, Yarn mappings, Java 21 |
+| 26.x client | Minecraft `26.1`, Mojang names, Java 25 |
+| Launcher | Java Swing app with embedded-client and download modes |
+| Tested release | `1.21.4` is currently listed in `tools/tested-versions.txt` |
+| Version builds | Discovered automatically from Fabric and Mojang metadata |
+| Ownership | Nova-owned source and project materials are proprietary; see [Ownership and usage policy](#ownership-and-usage-policy) |
+
+Start with [Quick start on Windows](#quick-start-on-windows), or jump to [Using Nova Launcher](#using-nova-launcher) and [Minecraft version support](#minecraft-version-support).
+
+## Repository layout
+
+| Path | Purpose |
+| --- | --- |
+| `NovaClient/` | Main Fabric client for Yarn-mapped Minecraft versions. |
+| `NovaClient26/` | Separate Fabric port for Minecraft 26.x, using Mojang names and Java 25. |
+| `NovaLauncher/` | Standalone Swing launcher that installs Minecraft, Fabric, Nova, optional mods, and Java runtimes. |
+| `tools/` | Version discovery, multi-version builds, release manifest generation, and tested-version metadata. |
+| `.github/workflows/` | Release, 26.x build, and Mojang-name porting workflows. |
+
+## Features
+
+The Nova client includes:
+
+- A custom animated main menu and themed visual system.
+- Singleplayer, multiplayer, account, skin, friend, resource-pack, and settings screens.
+- Microsoft account authentication and offline accounts.
+- A Right Shift module menu with categories and per-module settings.
+- HUD modules such as FPS, ping, CPS, coordinates, direction, clock, keystrokes, armor, potion status, speed, memory, combo, and module list.
+- A HUD editor for moving and resizing HUD elements.
+- Zoom, toggle sprint, fullbright, custom crosshair, and low-fire modules.
+- Five shared launcher/client palettes: Twilight, Lagoon, Dusk, Meadow, and Blossom.
+
+Sodium, Iris, and Freecam are optional Modrinth downloads managed by the launcher. They are not bundled in either client jar.
+
+## Prerequisites
+
+For the main client and launcher:
+
+- A full JDK 21, including `javac` and `jpackage` for the complete Windows build.
+- Internet access for Gradle dependencies, Minecraft files, Fabric metadata, Modrinth downloads, and account authentication.
+- Gradle installed, or let the build scripts download a project-local Gradle distribution.
+
+For `NovaClient26/`, use JDK 25. Minecraft 26.x is unobfuscated and uses a separate Loom configuration.
+
+On Windows, install JDK 21 with:
+
+```powershell
+winget install EclipseAdoptium.Temurin.21.JDK
 ```
-Nova/
-  NovaClient/     the Fabric mod (menu, accounts, skins, friends, modules...)
-  NovaLauncher/   the desktop app that installs Minecraft + Fabric + Nova and starts it
-  NovaLauncher.jar   ready-to-run launcher (needs Java 21+)
-  .github/        auto-release pipeline
+
+Close and reopen the terminal after installation.
+
+## Quick start on Windows
+
+Build the default client jar:
+
+```bat
+cd NovaClient
+build-mod.bat
 ```
 
+The jar is written to `NovaClient/build/libs/`. Use the jar without `-sources` or `-dev` in its name.
 
-## What is new in v6: every Minecraft version, built automatically
+Build and run the standalone launcher:
 
-Click **minecraft 1.21.4 v** in the launcher (top left) to pick any release from **1.16.5 up to 1.21.11** (the range where the client can be built; see "Which versions" below).
-Press Play and the launcher installs that Minecraft + Fabric + Fabric API and, if there is one, the Nova Client build made for that exact version.
-
-- **Fabric only** next to a version = no Nova build for it yet. It still starts as plain Fabric, so the version is always playable.
-- **Nova (experimental)** = the build compiled in CI but nobody has played it yet. Mixins that do not fit are skipped instead of crashing the game.
-- The **cube icon** in the bottom dock opens **Mods**: switch any mod on/off, import jars (button or drag and drop), remove them.
-  Mods that need a different Minecraft version are marked, and the launcher switches them off before starting so Fabric never shows "Incompatible mods found".
-- Settings has a **Load Nova Client** switch (off = plain Fabric) if a version misbehaves.
-
-**You never build the client by hand.** `.github/workflows/release.yml` does it on GitHub:
-
-1. `tools/ci/discover.py` asks Fabric which stable versions exist (1.16.5 up to the newest with Yarn mappings), finds the Yarn mappings and Fabric API for each, and asks Mojang which Java each needs.
-2. One build job per version compiles Nova with `gradle build -Pminecraft_version=... -Pyarn_mappings=... -Pfabric_version=... -Pjava_version=...`.
-   A version whose code does not compile yet is skipped (listed in the run summary), the rest ship.
-3. `tools/ci/make_manifest.py` writes `latest.json` with one entry per version (`builds`) and publishes the release.
-
-It runs when you push a tag (`git tag v0.7.0 && git push --tags`), by hand (Actions > Release > Run workflow, optionally for a few versions), and **every Monday**,
-which picks up newly released Minecraft versions without you doing anything. Put `tools/tested-versions.txt` to use: list a version there once you have played it and it loses the "experimental" label.
-
-The code in `NovaClient/src` is written against 1.21.4. Where Mojang changed something between versions the build for that version fails and is skipped;
-fixing it means adding a small version check in the code (or splitting the file) and the next run picks it up. Nothing else changes.
-
-Where it lives: `VersionList` (picker data), `NovaManifest` (latest.json), `NovaUpdater.installNova` (right jar per version, removes the others),
-`Installer` (now also unpacks old-style natives and uses Mojang's log4j config, needed for 1.14 - 1.18).
-Sodium, Iris and Freecam are **not** part of the client any more. The launcher shows a **Choose your mods** window (first Play, and later under Mods > *Sodium / Iris / Freecam...*). Tick what you want; on Play the launcher downloads the matching build for the selected Minecraft version from Modrinth and removes the ones you switched off. Iris automatically brings Sodium. If a mod has no build for a version it says so and starts without it.
-
-### Which versions get a client jar
-One source tree builds for every version from **1.16.5 to 1.21.11**. Code that differs between versions sits between `//#if MC >= 2000 ... //#else ... //#endif` markers (MC = minor*100+patch, so 1.20 = 2000, 1.21.4 = 2104); Gradle's `preprocess` task keeps the matching branch before compiling. All the version-specific Minecraft calls are in `compat/Mc.java`, `gui/Gfx.java`, `gui/NovaScreen.java` and the mixins.
-- 1.14 and 1.15 are not built: their Fabric API and rendering are too different (no MatrixStack / events).
-- 26.x and newer have no Yarn mappings (Mojang stopped obfuscating), so they need a Loom port first.
-- Custom background images need 1.20+; older versions use the built-in night sky.
-- Version 1.21.4 is the only one marked *tested*. Every other version is built with lenient mixins so a changed Minecraft method is skipped instead of crashing. If a version fails to compile, the release run saves `FAILED-log-<version>` as an artifact with the Gradle log.
-
-
-## What is new in v3 (Nova Serenity, client 0.6.0)
-
-The in-game client has a new identity: calm, soft and a little out of this world. Nothing flashes, everything eases.
-
-![Menu](docs/client-menu.png)
-
-- **A living night sky behind every screen**: slow aurora curtains, twinkling stars, three layers of hills with mist,
-  drifting fireflies and a shooting star every 17 seconds. Mouse parallax moves the layers gently.
-- **The hub**: a quiet left column (logo, two big "doors" for Singleplayer / Multiplayer, six small pills, your saved
-  servers under "Jump back in") in front of a slowly turning ringed planet with an orbiting moon. A time-aware
-  greeting and soft tips ("Breathe in. Pick a world.") replace the old tile grid.
-- **Truly rounded glass** everywhere (`Ui.rrect`, `Ui.panel`) instead of cut corners, with hairline rims and soft shadows.
-- **Module menu**: a floating frosted panel, a pill that glides under the active tab, pill switches, rounded sliders.
-- **HUD**: every panel is frosted glass with a thin line of light along the top edge (`module/Hud.java`).
-- **Toasts** drift down and a thin line slowly drains instead of a bar.
-- **5 calm palettes** (Twilight, Lagoon, Dusk, Meadow, Blossom). Same indexes 0-4 as before, so the launcher's
-  `-Dnova.theme` still lines up. Change it in game: Right Shift > Visual > Theme.
-
-![Palettes](docs/client-themes.png)
-
-New building blocks if you want to extend it: `gui/Cosmos.java` (the sky and the planet), `Ui.rrect / rim / panel / glow /
-sparkle / bar`, `AnimButton.Style.ROW` and `PILL`, and `Anim.breathe / smooth / easeInOutSine`.
-Colours live in `gui/Theme.java` (accent, deep accent, warm secondary, two sky colours, three aurora colours).
-
-Note: the scene is drawn with plain GUI fills (a few thousand rectangles per frame). It is fine on normal PCs; on a very weak
-machine you can lower the aurora cost by raising `step` in `Cosmos.aurora`.
-
-## What is new in v2 (Nova Aurora design)
-
-**Launcher**: rebuilt UI with a sidebar, a hero card (your skin on an animated night scene), profile rows with a big Play button, a status column, a Console page and a dark Settings window with a memory slider. Login / install / update logic is unchanged.
-
-**5 colour themes** (Nova, Ocean, Sunset, Emerald, Rose): click the palette button in the launcher sidebar. The choice is saved and passed to the game (`-Dnova.theme`), so the in-game menu, HUD panels and module list use the same colours. You can also change it in the game: Right Shift > Visual > Theme.
-
-![Themes](docs/launcher-themes.png)
-
-**New modules (Right Shift menu)**
-
-| Module | Tab | What it does |
-|---|---|---|
-| Fullbright | Visual | Max brightness everywhere. Restores your old brightness when off or on exit. |
-| Crosshair | Visual | Custom crosshair: size, gap, thickness, colour, centre dot. Replaces the vanilla one. |
-| Low Fire | Visual | Fire overlay no longer covers your view (adjustable). |
-| Theme | Visual | Palette 0-4 for the whole client. |
-| Speed | HUD | Blocks per second. |
-| Memory | HUD | RAM used / max. |
-| Combo | HUD | Hits in a row, resets when you get hit or after 3 s. |
-| Module List | HUD | Shows which features are on, with accent bars. |
-
-HUD panels (Potion Status, Armor Status, Coordinates) use titled glass panels. Shared look lives in `module/Hud.java` (`Hud.titled(...)`). New HUD modules are off by default so your layout does not change; turn them on in the menu and place them with the HUD editor.
-
-![Launcher](docs/launcher-home.png)
-
-## One app: launcher + client together (Windows)
-1. Install the JDK once: `winget install EclipseAdoptium.Temurin.21.JDK` (then reopen the window).
-2. Double-click **build-everything.bat**. It builds the Nova Client mod and packs it INSIDE the launcher,
-   then makes a standalone **NovaLauncher.exe**. Everything ends up in the `dist` folder.
-3. Run `dist\NovaLauncher\NovaLauncher.exe`. Two ways to play:
-   - **PLAY**: installs Nova Client + Fabric API + Fabric + Minecraft and starts the game (Microsoft login
-     needs your Azure client ID in Settings; otherwise it starts offline).
-   - **Add to Minecraft Launcher**: adds a "Nova Client" profile to the official launcher in one click.
-     The official launcher handles your Microsoft login, so no Azure app is needed.
-   Updates: a new build of the launcher carries the new mod; with an update URL set, the launcher can also
-   fetch a newer mod by itself (it only downloads when the online version is newer than the built-in one).
-
-## What is in the client (0.4)
-- **Animated hub**: shimmering logo, parallax background with floating particles, big Play buttons,
-  icon tiles, quick-join for your saved servers, tips, and a profile pill (top right).
-- **Profile**: your skin on a glowing platform, Nova level + XP bar, playtime, sessions, friends, modules.
-- **Module menu** (Right Shift): search, tabs, animated cards, per-module settings (sliders).
-- **HUD editor**: drag elements anywhere (edges and centre snap), scroll over one to resize.
-- **HUD**: FPS, Ping, CPS, Coordinates, Direction, Clock, Keystrokes (animated), Armor, Potion Status.
-- **Camera**: Zoom (hold C, adjustable level). Freecam is available as an optional mod from the launcher.
-- **Toasts** slide in for toggles, logins, updates. Custom wallpaper with slow zoom + mouse parallax.
-
-## Quick start (no GitHub needed)
-1. Build the mod: open `NovaClient/` in IntelliJ (or `gradle build`) -> `build/libs/novaclient-0.6.0.jar`
-2. Run the launcher: `java -jar NovaLauncher.jar`
-3. Settings -> "Local Nova jar" -> pick that jar -> **PLAY**.
-   The launcher downloads Minecraft, Fabric, Fabric API (newest), copies your jar in, and starts the game.
-   Not logged in = offline mode (singleplayer / offline servers only).
-
-## Automatic updates (the "always newest" part)
-1. Put this folder in a GitHub repo.
-2. In the launcher Settings set **Update manifest URL** to
-   `https://github.com/YOU/REPO/releases/latest/download/latest.json`
-3. To ship a new version: `git tag v0.6.1 && git push --tags`.
-   GitHub Actions builds everything and publishes `latest.json`.
-4. Every player's launcher sees it on the next PLAY: it downloads the new Nova jar (checksum verified),
-   removes the old one, refreshes Fabric API, and starts. The in-game menu also shows an "Update available" card.
-
-What updates by itself: Nova, Fabric API, Fabric Loader, Minecraft files, even the Java runtime.
-What needs you once per Minecraft release: nothing for the pipeline (it finds the new version by itself). If the new version does not
-compile, fix the code that Mojang renamed and tag again. `latest.json` names the default Minecraft version, and every launcher set to "automatic" moves to it.
-
-## Login
-Players click **sign in** in the launcher. A window offers two ways:
-- **Sign in with Microsoft**: the browser opens on Microsoft's own page, the player logs in with their Xbox / Microsoft
-  account and the launcher picks the answer up by itself (no code to type).
-- **Use a code instead**: a short code (already copied) and a link that opens with the code filled in. Works from a phone
-  or another computer, or when the browser cannot reach back to this PC.
-
-Your password is never typed into Nova. The player stays signed in; the token is kept in `launcher.json`, so keep that private.
-
-**One-time setup for you (the developer), so players need nothing:**
-1. Create a free app at https://portal.azure.com > Microsoft Entra ID > App registrations > New registration.
-   Account type: *Personal Microsoft accounts only*. Redirect URI: platform *Mobile and desktop applications*,
-   value `http://localhost`. Under Authentication turn on **Allow public client flows**.
-2. Ask Mojang to approve the app for Minecraft login (https://aka.ms/mce-reviewappid). Until then, the login ends with
-   "Invalid app registration".
-3. In your GitHub repo: Settings > Secrets and variables > Actions > **Variables** > new variable `AZURE_CLIENT_ID`
-   with the app's *Application (client) ID*. The release pipeline builds it into the launcher and passes it to the game.
-You can still override it per player in launcher Settings.
-
-## Package as a real app (.exe / .app / .deb)
+```bat
+cd NovaLauncher
+build.bat
+java -jar NovaLauncher.jar
 ```
-cd NovaLauncher && ./build.sh
-jpackage --type exe --name "Nova Launcher" --input . --main-jar NovaLauncher.jar \
-         --main-class com.nova.launcher.LauncherApp --win-shortcut --win-menu
-```
-Use `--type dmg` on macOS, `--type deb` on Linux (jpackage must run on the target OS).
 
-## Licenses
-Sodium, Iris and Freecam are downloaded from Modrinth on request and keep their own licenses; Nova does not redistribute them.
+Build the complete Windows distribution, including the client embedded in the launcher:
+
+```bat
+build-everything.bat
+```
+
+This creates:
+
+- `dist/NovaLauncher/NovaLauncher.exe`
+- `dist/NovaLauncher-windows.zip`
+- `dist/NovaLauncher.jar`
+
+The app-image executable does not require Java on the player's machine. The jar requires Java 21 or newer.
+
+## Building every Yarn-mapped version
+
+The main client uses one source tree with `//#if`, `//#elseif`, and `//#else` markers. Gradle preprocesses those markers into `build/pp/` before compiling; files under `src/` are not modified.
+
+Build every version discovered by the tooling:
+
+```bat
+build-all-versions.bat
+```
+
+Build only selected versions:
+
+```bat
+build-all-versions.bat 1.20.1 1.21.4
+```
+
+Results are written to `dist/mods/`. The script also writes `dist/build-report.txt` and preserves logs for failed versions. A version is included only when Fabric metadata, mappings, Fabric API, Java requirements, and compilation are available.
+
+## Running the client in a development environment
+
+From `NovaClient/`:
+
+```sh
+gradle runClient
+gradle build
+```
+
+The repository does not include a Gradle wrapper, so `./gradlew` and `gradlew.bat` are not available unless you add one yourself. The supplied `build-mod.bat` and `build-mod.sh` scripts select or download Gradle for the project.
+
+The default development properties are in `NovaClient/gradle.properties`:
+
+```text
+minecraft_version=1.21.4
+yarn_mappings=1.21.4+build.8
+loader_version=0.16.10
+fabric_version=0.119.2+1.21.4
+mod_version=0.7.0
+```
+
+## Minecraft version support
+
+### Main client
+
+The release workflow discovers stable Fabric and Yarn-supported versions starting at `1.16.5`. The actual release set is dynamic: a version can be omitted when its metadata is unavailable or the source does not compile for it.
+
+- `1.14` and `1.15` are not supported by the main build.
+- `1.21.4` is currently the only version listed in `tools/tested-versions.txt` and is marked tested in the release manifest.
+- Other successful builds are experimental and use lenient mixins when configured that way.
+- A version with no Nova jar can still run as plain Fabric through the launcher.
+- Java requirements vary by Minecraft version; the build pipeline selects the required release automatically.
+
+### Minecraft 26.x port
+
+`NovaClient26/` targets Minecraft 26.x, where the game is unobfuscated and Yarn mappings are not used. It uses Mojang names, Java 25, and a separate version-number preprocessor.
+
+Build the default local port with JDK 25:
+
+```sh
+cd NovaClient26
+gradle build
+```
+
+The port is built in CI through `.github/workflows/build-26.yml` or as part of the 26.x matrix in `.github/workflows/release.yml`. It may not have complete feature parity with the main client yet.
+
+## Using Nova Launcher
+
+The launcher can:
+
+- Install Minecraft, Fabric Loader, Fabric API, libraries, assets, natives, and logging configuration.
+- Select any Minecraft release returned by Fabric's version metadata.
+- Download the matching Nova jar from `latest.json` and verify its SHA-256 checksum.
+- Run plain Fabric by disabling Nova in Settings.
+- Manage optional Sodium, Iris, and Freecam downloads per Minecraft version.
+- Import, enable, disable, and remove user mods, resource packs, and shader packs.
+- Add a Nova profile to the official Minecraft Launcher.
+- Download a suitable Adoptium Java runtime when the selected Minecraft version needs a newer Java release.
+- Use a locally built Nova jar instead of downloading one.
+
+The launcher stores its configuration and refresh token at:
+
+- Windows: `%APPDATA%\\.novaclient\\launcher.json`
+- macOS: `~/Library/Application Support/novaclient/launcher.json`
+- Linux: `~/.novaclient/launcher.json`
+
+Keep this file private because it can contain a refresh token. The game instances are stored under the platform-specific Nova home, in `instances/default/`.
+
+## Microsoft login
+
+Nova supports browser PKCE login, device-code login, and offline accounts. Direct Microsoft login requires:
+
+1. A Microsoft Entra ID public client application.
+2. Public client flows enabled.
+3. `http://localhost` configured as a redirect URI for browser login.
+4. Approval for Minecraft API access where required.
+5. A Microsoft account that owns Minecraft: Java Edition.
+
+The client ID can be entered in launcher Settings. Release builds can provide it automatically through the GitHub repository variable `AZURE_CLIENT_ID`. Adding a profile to the official Minecraft Launcher delegates authentication to that launcher and does not require Nova's client ID.
+
+Offline mode is suitable for singleplayer and offline-compatible servers only.
+
+## Release workflow
+
+The `Release` workflow runs on `v*` tags, manual dispatch, and every Monday at 05:00 UTC.
+
+Create a release from a tag:
+
+```sh
+git tag v0.7.0
+git push --tags
+```
+
+The workflow:
+
+1. Runs `tools/ci/discover.py` to create the main and 26.x build matrices.
+2. Builds each version independently.
+3. Uploads successful client jars and failed-version logs as artifacts.
+4. Builds and self-tests `NovaLauncher.jar`.
+5. Runs `tools/ci/make_manifest.py`.
+6. Publishes client jars, `latest.json`, and the launcher jar to the GitHub release.
+
+To limit a manual release run, use the `only_mc` input with comma-separated versions. `latest.json` records the release version, default Minecraft version, available builds, SHA-256 hashes, tested flags, and launcher metadata.
+
+The `Build 26.x` workflow accepts a Minecraft 26.x version manually and uploads either the jar or a detailed failure log as an artifact. `port-mojang.yml` creates an intermediate Mojang-name source artifact; it does not publish a finished client.
+
+## Packaging on macOS and Linux
+
+Build the launcher jar on Unix-like systems:
+
+```sh
+cd NovaLauncher
+./build.sh
+java -jar NovaLauncher.jar
+```
+
+`jpackage` must run on the target operating system. Use `--type dmg` on macOS or `--type deb` on Linux. The repository currently provides a complete app-image and zip flow only through `build-everything.bat` on Windows.
+
+## Known limitations
+
+- A successful compilation does not mean that a Minecraft version has been tested in-game.
+- Optional mods may not have a compatible Modrinth build for every Minecraft version.
+- Worlds are kept in per-version instance directories and are not copied between versions.
+- Initial installation, updates, version discovery, and optional-mod downloads require network access.
+- The 26.x port is separate from the Yarn-based client and may lag behind it in feature coverage.
+
+## Ownership and usage policy
+
+**Nova Client is privately owned. All rights reserved.** Nova Client, Nova Launcher, and the Nova project as a whole are proprietary projects. Unless a file or dependency is explicitly identified as third-party material, the following are owned by the Nova project owners:
+
+- Source code and compiled Nova binaries.
+- The Nova name, branding, logos, artwork, interface designs, and visual themes.
+- Documentation, screenshots, configuration, build scripts, CI workflows, release tooling, and project structure.
+- Any other original materials created for or included with Nova.
+
+No permission or license is granted to copy, fork, clone, mirror, modify, publish, redistribute, sell, sublicense, repackage, reverse engineer, incorporate, or create derivative works from Nova-owned material. This restriction applies whether the use is commercial or non-commercial and whether the material is used in whole or in part.
+
+Use, distribution, or publication of Nova-owned material requires **prior written permission from the Nova project owners**. Unauthorized use may result in removal requests and enforcement of applicable copyright, trademark, contract, and other intellectual-property rights to the fullest extent permitted by law. Do not use or distribute this project beyond its permitted purpose without contacting the owners first.
+
+This notice does not claim ownership of Minecraft, Fabric, Microsoft, Mojang, Modrinth, or any other third-party technology. Those technologies remain the property of their respective owners and are governed by their own terms and licenses.
+
+Nova does not redistribute Sodium, Iris, or Freecam. The launcher downloads them from Modrinth on request, and each mod remains subject to its own license and its respective owners' rights.
+
+---
+This file was created by Nova team © 2026

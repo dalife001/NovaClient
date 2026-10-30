@@ -65,7 +65,8 @@ public final class SelfTest {
         String joined = String.join(" ", cmd);
         check("cmd has main class after jvm args", cmd.indexOf(plan.mainClass()) > cmd.indexOf("-cp"));
         check("cmd substitutes name", cmd.contains("Steve"));
-        check("cmd substitutes classpath", joined.contains("/g/a.jar" + java.io.File.pathSeparator + "/g/b.jar"));
+        String expectedClasspath = Path.of("/g/a.jar").toString() + java.io.File.pathSeparator + Path.of("/g/b.jar").toString();
+        check("cmd substitutes classpath", joined.contains(expectedClasspath));
         check("cmd has no leftover placeholders", !joined.contains("${"));
         check("cmd sets memory", cmd.contains("-Xmx3072M"));
 

@@ -1,0 +1,53 @@
+name: Nova Client Testing
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.12.1
+
+      - name: Build Nova client
+        working-directory: NovaClient
+        run: gradle build --no-daemon --stacktrace
+
+      - name: Build launcher
+        working-directory: NovaLauncher
+        run: bash ./build.sh
+
+      - name: Run launcher self-tests
+        working-directory: NovaLauncher
+        run: java -cp NovaLauncher.jar com.nova.launcher.SelfTest
+
+      - name: Upload client and launcher jars for testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-testing-builds
+          path: |
+            NovaClient/build/libs/novaclient-*.jar
+            !NovaClient/build/libs/*-sources.jar
+            !NovaClient/build/libs/*-dev.jar
+            NovaLauncher/NovaLauncher.jar
+          if-no-files-found: error
+          retention-days: 14
