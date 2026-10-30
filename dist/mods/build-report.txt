@@ -1,0 +1,6 @@
+Nova Client 0.7.0
+CI versions selected: 35
+Built OK: all 35 versions, from 1.16.5 through 26.3
+Failed: none
+Skipped during CI discovery: none
+Embedded in launcher: 35 client jars

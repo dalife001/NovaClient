@@ -54,7 +54,7 @@ public final class SkinSearchDialog extends NovaScreen {
         statusColor = Ui.MUTED;
         Thread worker = new Thread(() -> {
             try {
-                String escaped = URLEncoder.encode(name, StandardCharsets.UTF_8);
+                String escaped = URLEncoder.encode(name, "UTF-8");
                 JsonObject profile = S.parseObject(get("https://api.mojang.com/users/profiles/minecraft/" + escaped));
                 if (!profile.has("id")) throw new IllegalStateException("No Minecraft profile found for " + name + ".");
                 String id = profile.get("id").getAsString();

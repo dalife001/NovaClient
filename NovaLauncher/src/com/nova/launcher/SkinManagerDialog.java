@@ -251,9 +251,23 @@ final class SkinManagerDialog extends JPanel {
         importMod.addActionListener(e -> importMod());
         JButton removeMod = button("Remove selected");
         removeMod.addActionListener(e -> removeSelectedMod());
+        JButton browse = button("Browse Modrinth");
+        browse.setPreferredSize(new Dimension(160, 38));
+        browse.addActionListener(e -> {
+            Path versionDir = modsDirectory.toAbsolutePath().normalize().getParent();
+            if (versionDir == null) {
+                setStatus("Could not locate the selected Minecraft version folder.", LauncherApp.RED);
+                return;
+            }
+            ModrinthDialog dialog = new ModrinthDialog(SwingUtilities.getWindowAncestor(this), versionDir, minecraftVersion);
+            dialog.addWindowListener(new java.awt.event.WindowAdapter() {
+                @Override public void windowClosed(java.awt.event.WindowEvent e) { reloadMods(); }
+            });
+            dialog.setVisible(true);
+        });
         JButton optional = button("Sodium / Iris / Freecam");
         optional.addActionListener(e -> setStatus("Optional mods can be managed from the launcher’s Mods controls.", LauncherApp.MUTED));
-        buttons.add(toggle); buttons.add(importMod); buttons.add(removeMod); buttons.add(optional);
+        buttons.add(browse); buttons.add(toggle); buttons.add(importMod); buttons.add(removeMod); buttons.add(optional);
         panel.add(buttons, BorderLayout.SOUTH);
         return panel;
     }

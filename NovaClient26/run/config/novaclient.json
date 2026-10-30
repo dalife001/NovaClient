@@ -1,0 +1,13 @@
+{
+  "azureClientId": "",
+  "refreshToken": "",
+  "backgroundPath": "",
+  "updateManifestUrl": "",
+  "modules": {},
+  "hud": {},
+  "settings": {},
+  "playSeconds": 0,
+  "launches": 1,
+  "firstLaunch": 1793387617585,
+  "friends": []
+}

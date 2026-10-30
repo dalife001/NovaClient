@@ -207,9 +207,13 @@ public final class LauncherApp {
     private void showVersions(List<String> vl) {
         NovaManifest m = manifest;
         Embedded emb = Embedded.load();
-        Map<String, NovaManifest.Build> builds = m == null ? Map.of() : m.builds();
+        Map<String, NovaManifest.Build> builds = new java.util.LinkedHashMap<>(m == null ? Map.of() : m.builds());
         String embMc = emb == null ? null : emb.minecraft;
-        new VersionDialog(frame, vl, cfg.mcVersion.isBlank() ? displayMc() : cfg.mcVersion, builds, embMc, picked -> {
+        if (emb != null) for (String version : emb.minecraftVersions()) builds.putIfAbsent(version, new NovaManifest.Build("", "", true));
+        List<String> selectableVersions = new ArrayList<>(vl);
+        if (emb != null) for (String version : emb.minecraftVersions()) if (!selectableVersions.contains(version)) selectableVersions.add(version);
+        selectableVersions.sort((a, b) -> Versions.cmp(b, a));
+        new VersionDialog(frame, selectableVersions, cfg.mcVersion.isBlank() ? displayMc() : cfg.mcVersion, builds, embMc, picked -> {
             cfg.mcVersion = picked;
             cfg.save();
             orbit.mc = displayMc();

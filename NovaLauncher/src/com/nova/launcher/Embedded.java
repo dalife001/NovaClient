@@ -49,6 +49,8 @@ final class Embedded {
 
     boolean supports(String mc) { return jars.containsKey(mc); }
 
+    java.util.Set<String> minecraftVersions() { return java.util.Set.copyOf(jars.keySet()); }
+
     String version(String mc) { return versions.getOrDefault(mc, version); }
 
     InputStream jar() { return jar(minecraft); }

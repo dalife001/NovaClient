@@ -376,7 +376,22 @@ final class ModrinthDialog extends JDialog {
         panel.setBorder(new EmptyBorder(20, 22, 18, 22));
 
         JLabel title = LauncherApp.label(hit.title(), 20, true, LauncherApp.TEXT);
-        JLabel meta = LauncherApp.label("by " + hit.author() + "  ?  " + count(hit.downloads()) + " downloads", 12, false, LauncherApp.MUTED);
+        JLabel meta = LauncherApp.label("by " + hit.author() + "  ·  " + count(hit.downloads()) + " downloads", 12, false, LauncherApp.MUTED);
+        JLabel projectImage = LauncherApp.label("", 12, false, LauncherApp.MUTED);
+        projectImage.setPreferredSize(new Dimension(88, 88));
+        BufferedImage image = icons.get(hit.id());
+        if (image != null) projectImage.setIcon(new ImageIcon(image.getScaledInstance(88, 88, Image.SCALE_SMOOTH)));
+        else {
+            projectImage.setText("Loading image...");
+            pool.submit(() -> {
+                BufferedImage fetched = fetchIcon(hit);
+                if (fetched != null) {
+                    icons.put(hit.id(), fetched);
+                    SwingUtilities.invokeLater(() -> projectImage.setIcon(new ImageIcon(fetched.getScaledInstance(88, 88, Image.SCALE_SMOOTH))));
+                    SwingUtilities.invokeLater(() -> projectImage.setText(""));
+                }
+            });
+        }
         JTextArea description = new JTextArea(hit.description());
         description.setEditable(false);
         description.setLineWrap(true);
@@ -389,7 +404,11 @@ final class ModrinthDialog extends JDialog {
         heading.setOpaque(false);
         heading.add(title);
         heading.add(meta);
-        panel.add(heading, BorderLayout.NORTH);
+        JPanel summary = new JPanel(new BorderLayout(14, 0));
+        summary.setOpaque(false);
+        summary.add(projectImage, BorderLayout.WEST);
+        summary.add(heading, BorderLayout.CENTER);
+        panel.add(summary, BorderLayout.NORTH);
         JScrollPane textScroll = new JScrollPane(description);
         textScroll.setBorder(BorderFactory.createLineBorder(LauncherApp.BORDER));
         textScroll.getViewport().setBackground(LauncherApp.SURFACE);
