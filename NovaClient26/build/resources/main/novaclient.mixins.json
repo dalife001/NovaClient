@@ -1,5 +1,5 @@
 {
-  "required": false,
+  "required": true,
   "package": "com.nova.client.mixin",
   "compatibilityLevel": "JAVA_25",
   "client": [
@@ -9,5 +9,5 @@
     "InGameOverlayRendererMixin"
     ,"SimpleOptionAccessor"
   ],
-  "injectors": { "defaultRequire": 0 }
+  "injectors": { "defaultRequire": 1 }
 }

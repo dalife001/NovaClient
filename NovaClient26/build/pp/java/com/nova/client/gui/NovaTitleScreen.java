@@ -118,13 +118,22 @@ public class NovaTitleScreen extends NovaScreen {
     /** Opens Iris's shader pack screen (looked up by name so the menu never breaks if Iris changes). */
     private void openShaders() {
         try {
+            java.nio.file.Path shaderPacks = net.fabricmc.loader.api.FabricLoader.getInstance().getGameDir().resolve("shaderpacks");
+            java.nio.file.Files.createDirectories(shaderPacks);
+            java.nio.file.Path bundled = shaderPacks.resolve("ChristmasAurora.zip");
+            try (java.io.InputStream in = NovaTitleScreen.class.getResourceAsStream("/assets/novaclient/shaderpacks/ChristmasAurora.zip")) {
+                if (in == null) throw new java.io.IOException("Bundled ChristmasAurora pack is missing");
+                java.nio.file.Files.copy(in, bundled, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
             Class<?> c = Class.forName("net.irisshaders.iris.gui.screen.ShaderPackScreen");
             Mc.setScreen(minecraft, (Screen) c.getConstructor(Screen.class).newInstance(this));
+            Toasts.push("Christmas Aurora", "Installed in shaderpacks; select it in Iris", Ui.GREEN);
+        } catch (ClassNotFoundException e) {
+            Toasts.push("Christmas Aurora", "Installed; add Iris to enable shader packs", Ui.AMBER);
         } catch (Throwable t) {
-            Toasts.push("Shaders", "Iris is not loaded", Ui.RED);
+            Toasts.push("Christmas Aurora", "Could not install shader pack", Ui.RED);
         }
     }
-
     private String greeting() {
         int h = LocalTime.now().getHour();
         String g = h < 5 ? "Still up" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
