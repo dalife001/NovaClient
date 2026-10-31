@@ -11,6 +11,9 @@ public final class ChristmasModule extends Module {
     public final NumberSetting glow = new NumberSetting("Glow", 0, 100, 8, 1);
     public final NumberSetting quality = new NumberSetting("Quality", 1, 3, 1, 1);
     public final NumberSetting lights = new NumberSetting("Festive lights", 0, 100, 28, 1);
+    public final NumberSetting mode = new NumberSetting("Sky mode (0 auto, 1 day, 2 night)", 0, 2, 0, 1);
+    public final NumberSetting aurora = new NumberSetting("Aurora intensity", 0, 100, 55, 1);
+    public final NumberSetting snowVeil = new NumberSetting("Snowy day haze", 0, 100, 18, 1);
 
     private static final int MAX_FLAKES = 220;
     private static final int[] COLORS = {0xFFF6FFFF, 0xFFD9F2FF, 0xFFFFF0D6};
@@ -23,6 +26,9 @@ public final class ChristmasModule extends Module {
         settings.add(glow);
         settings.add(quality);
         settings.add(lights);
+        settings.add(mode);
+        settings.add(aurora);
+        settings.add(snowVeil);
     }
 
     @Override public String category() { return "Visual"; }
@@ -34,7 +40,12 @@ public final class ChristmasModule extends Module {
         if (width < 2 || height < 2) return;
 
         float time = System.nanoTime() / 1_000_000_000f;
+        boolean night = isNight(mc);
+        int skyMode = (int) mode.get();
+        if (skyMode == 1) night = false;
+        else if (skyMode == 2) night = true;
         int q = (int) quality.get();
+        drawSkyAtmosphere(ctx, width, height, time, q, night);
         float densityScale = q == 1 ? 0.45f : q == 2 ? 0.75f : 1f;
         int count = Math.min(MAX_FLAKES, Math.round((float) density.get() * densityScale));
         float motion = (float) speed.get() / 100f;
@@ -63,6 +74,39 @@ public final class ChristmasModule extends Module {
         }
 
         drawLights(ctx, width, height, time, q);
+    }
+
+    private void drawSkyAtmosphere(Gfx ctx, int width, int height, float time, int q, boolean night) {
+        int skyHeight = Math.max(1, height * (night ? 46 : 34) / 100);
+        if (!night) {
+            int haze = (int) (snowVeil.get() * 0.42f);
+            if (haze > 0) ctx.fillGradient(0, 0, width, skyHeight, (haze << 24) | 0xEAF7FF, 0x00EAF7FF);
+            return;
+        }
+        int intensity = (int) aurora.get();
+        if (intensity <= 0) return;
+        int ribbons = q == 1 ? 2 : q == 2 ? 3 : 4;
+        int steps = q == 1 ? 34 : q == 2 ? 58 : 88;
+        int[] colors = {0xFF39E8B1, 0xFF58CFFF, 0xFF9D78FF, 0xFF64F4D2};
+        for (int band = 0; band < ribbons; band++) {
+            for (int i = 0; i < steps; i++) {
+                float u = i / (float) steps;
+                float wave = (float) Math.sin(u * 8.0f + time * (0.42f + band * 0.08f) + band * 2.1f);
+                float wave2 = (float) Math.sin(u * 14.0f - time * 0.28f + band * 1.7f);
+                int x = (int) (u * width);
+                int x2 = (int) ((i + 1) * width / (float) steps + 1);
+                int y = 8 + band * Math.max(5, skyHeight / 10) + Math.round(wave * skyHeight * 0.10f + wave2 * skyHeight * 0.035f);
+                int thickness = Math.max(2, skyHeight / (q == 1 ? 22 : 18));
+                int alpha = Math.min(70, Math.max(1, Math.round(intensity * (0.12f + 0.18f * (0.5f + 0.5f * wave2)))));
+                int color = colors[band % colors.length];
+                ctx.fill(x, y, x2, y + thickness, (alpha << 24) | (color & 0xFFFFFF));
+                if (q >= 2) ctx.fill(x, y + thickness, x2, y + thickness + 1, ((alpha / 2) << 24) | 0xC7FFF5);
+            }
+        }
+    }
+
+    private static boolean isNight(Minecraft mc) {
+        return mc.level.isDarkOutside();
     }
 
     private void drawLights(Gfx ctx, int width, int height, float time, int q) {

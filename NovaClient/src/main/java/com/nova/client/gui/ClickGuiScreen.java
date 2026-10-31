@@ -269,7 +269,9 @@ public class ClickGuiScreen extends NovaScreen {
                     if (!Ui.inside(mx, my, cx, cy, cw, CH)) continue;
                     Module m = list.get(i);
                     click();
-                    if (!m.settings.isEmpty() && Ui.inside(mx, my, cx + cw - 18, cy + 4, 16, 16)) {
+                    if (m == NovaClient.modules.christmas && Ui.inside(mx, my, cx + cw - 18, cy + 4, 16, 16)) {
+                        Mc.setScreen(client, new ChristmasSettingsScreen(this));
+                    } else if (!m.settings.isEmpty() && Ui.inside(mx, my, cx + cw - 18, cy + 4, 16, 16)) {
                         selected = (selected == m) ? null : m; // gear: open/close settings
                     } else {
                         toggle(m);
