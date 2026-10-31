@@ -15,6 +15,7 @@ public class ModuleManager {
     public final LowFireModule lowFire = new LowFireModule();
     public final CrosshairModule crosshair = new CrosshairModule();
     public final ThemeModule theme = new ThemeModule();
+    public final ChristmasModule christmas = new ChristmasModule();
 
     public ModuleManager() {
         modules.add(new FpsModule());
@@ -36,6 +37,7 @@ public class ModuleManager {
         modules.add(crosshair);
         modules.add(lowFire);
         modules.add(theme);
+        modules.add(christmas);
 
         Config cfg = Config.get();
         for (Module m : modules) {
