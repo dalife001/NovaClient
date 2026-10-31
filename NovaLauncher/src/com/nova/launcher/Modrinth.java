@@ -5,6 +5,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 
 /**
@@ -149,9 +150,19 @@ final class Modrinth {
                 if ("required".equals(d.type())) installOne(d.projectId(), "a required mod", kind, mc, versionDir, p, added, seen, depth + 1, false);
             }
         }
-        Path dest = versionDir.resolve(kind.folder).resolve(safeName(v.filename()));
+        String filename = safeName(v.filename());
+        Path dest = versionDir.resolve(kind.folder).resolve(filename);
         p.status("Downloading " + title + "...");
         Http.download(v.url(), dest, "SHA-512", v.sha512());
+        // The Nova launcher runs each Minecraft version in its own game directory, while
+        // the official launcher profile uses the shared game directory. Keep packs visible
+        // to both launch paths; mods remain strictly version-specific.
+        Path shared = sharedResourceDir(versionDir, kind);
+        if (shared != null) {
+            Path sharedFile = shared.resolve(filename);
+            Files.createDirectories(shared);
+            Files.copy(dest, sharedFile, StandardCopyOption.REPLACE_EXISTING);
+        }
         state = installed(versionDir, kind);
         Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("title", title);
@@ -168,23 +179,47 @@ final class Modrinth {
         Map<String, Object> entry = Json.o(state.get(projectId));
         String file = Json.str(entry, "file");
         if (file == null) return false;
-        Files.deleteIfExists(versionDir.resolve(kind.folder).resolve(file));
+        Path versionFile = versionDir.resolve(kind.folder).resolve(file);
+        Path shared = sharedResourceDir(versionDir, kind);
+        if (shared != null && Files.isRegularFile(versionFile) && Files.isRegularFile(shared.resolve(file))
+                && Files.mismatch(versionFile, shared.resolve(file)) == -1) Files.deleteIfExists(shared.resolve(file));
+        Files.deleteIfExists(versionFile);
         Files.deleteIfExists(versionDir.resolve(kind.folder).resolve(file + ".disabled"));
         state.remove(projectId);
         saveInstalled(versionDir, kind, state);
         return true;
     }
 
+    /** Shared game-folder copy for packs, which are also consumed by the official launcher profile. */
+    static Path sharedResourceDir(Path versionDir, Kind kind) {
+        if (kind != Kind.PACK && kind != Kind.SHADER) return null;
+        Path versions = versionDir.toAbsolutePath().normalize().getParent();
+        if (versions == null || !"versions".equalsIgnoreCase(String.valueOf(versions.getFileName()))) return null;
+        Path gameDir = versions.getParent();
+        return gameDir == null ? null : gameDir.resolve(kind.folder);
+    }
+
     /**
-     * Where to try to get a project's icon. Modrinth hands out small WebP thumbnails, which Java cannot read, so the
-     * original upload (same hash, a normal image type) is tried next. Package-private for the self test.
+     * Modrinth often appends a thumbnail size and query parameters to WebP URLs. ImageIO cannot decode WebP,
+     * so try the original upload extensions after normalizing the path while preserving its query string.
      */
     static List<String> iconCandidates(String url) {
         List<String> out = new ArrayList<>();
         if (url == null || url.isBlank()) return out;
-        if (!url.toLowerCase().endsWith(".webp")) { out.add(url); return out; }
-        String base = url.replaceAll("(_\\d+)?\\.webp$", "");
-        for (String ext : new String[]{".png", ".jpg", ".jpeg", ".gif"}) out.add(base + ext);
+        try {
+            java.net.URI uri = java.net.URI.create(url);
+            String path = uri.getRawPath();
+            if (path == null || !path.toLowerCase(Locale.ROOT).endsWith(".webp")) { out.add(url); return out; }
+            String base = path.replaceFirst("(?i)(_[0-9]+)?\\.webp$", "");
+            String suffix = (uri.getRawQuery() == null ? "" : "?" + uri.getRawQuery())
+                    + (uri.getRawFragment() == null ? "" : "#" + uri.getRawFragment());
+            String prefix = url.substring(0, url.indexOf(path));
+            for (String ext : new String[]{".png", ".jpg", ".jpeg", ".gif"}) out.add(prefix + base + ext + suffix);
+            out.add(url);
+            // Some projects only publish a WebP icon. Use a PNG-transcoding image proxy
+            // as a final fallback because the launcher's standard Java runtime has no WebP reader.
+            out.add("https://images.weserv.nl/?url=" + enc(uri.getHost() + path + suffix) + "&output=png");
+        } catch (IllegalArgumentException e) { out.add(url); }
         return out;
     }
 

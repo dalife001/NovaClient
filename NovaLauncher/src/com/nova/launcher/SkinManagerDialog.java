@@ -5,6 +5,7 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.awt.RenderingHints;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -390,18 +391,13 @@ final class SkinManagerDialog extends JPanel {
     }
 
     private static BufferedImage carouselSprite(BufferedImage skin, boolean slim) {
+        // Keep the Minecraft 1:2 body ratio. Scaling 128x256 into 128x152 made skins
+        // look squat and much wider than their in-game model.
         BufferedImage body = SkinRenderer.toImage(SkinRenderer.front(skin, slim), 8);
-        BufferedImage sprite = new BufferedImage(144, 196, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage sprite = new BufferedImage(160, 280, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = sprite.createGraphics();
-        LauncherApp.aa(g);
-        g.setPaint(new RadialGradientPaint(72, 158, 66, new float[]{0f, 1f}, new Color[]{new Color(LauncherApp.ACCENT.getRed(), LauncherApp.ACCENT.getGreen(), LauncherApp.ACCENT.getBlue(), 90), new Color(0, 0, 0, 0)}));
-        g.fillOval(4, 85, 136, 110);
-        g.setColor(new Color(255, 255, 255, 32));
-        g.fillOval(43, 164, 58, 9);
-        g.setColor(LauncherApp.alpha(LauncherApp.ACCENT, 170));
-        g.setStroke(new BasicStroke(1.2f));
-        g.drawOval(28, 8, 88, 172);
-        g.drawImage(body, 8, 24, 128, 152, null);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        g.drawImage(body, 16, 12, null);
         g.dispose();
         return sprite;
     }

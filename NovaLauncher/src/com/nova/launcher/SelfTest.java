@@ -264,6 +264,9 @@ public final class SelfTest {
         check("per version: folder layout", v1214.equals(game.resolve("versions").resolve("1.21.4").resolve("mods")));
         check("per version: options carried over once", java.nio.file.Files.readString(vdir.resolve("options.txt")).equals("fov:70"));
         check("per version: resource packs carried over", java.nio.file.Files.exists(vdir.resolve("resourcepacks").resolve("pack.zip")));
+        check("modrinth packs: shared resource directory", Modrinth.sharedResourceDir(vdir, Modrinth.Kind.PACK).equals(game.resolve("resourcepacks")));
+        check("modrinth shaders: shared shader directory", Modrinth.sharedResourceDir(vdir, Modrinth.Kind.SHADER).equals(game.resolve("shaderpacks")));
+        check("modrinth mods: remain version-specific", Modrinth.sharedResourceDir(vdir, Modrinth.Kind.MOD) == null);
         check("per version: worlds are not copied", !java.nio.file.Files.exists(vdir.resolve("saves")));
         check("per version: other versions are separate", !NovaUpdater.versionDir(game, "1.16.5").equals(vdir));
         check("mods per version: your own mod is copied", java.nio.file.Files.exists(v1214.resolve("mymod.jar")));
@@ -313,7 +316,9 @@ public final class SelfTest {
         check("modrinth: Fabric API is not offered (the launcher installs it)", pg.hits().stream().noneMatch(x -> x.id().equals("P7dR8mSH")));
         check("modrinth: the project colour is kept for the placeholder tile", pg.hits().get(0).color() == 16711680);
         java.util.List<String> iconList = Modrinth.iconCandidates("https://cdn.modrinth.com/data/AANobbMI/295862f4_96.webp");
-        check("modrinth: a WebP thumbnail falls back to the original image", iconList.get(0).equals("https://cdn.modrinth.com/data/AANobbMI/295862f4.png") && iconList.size() == 4);
+        check("modrinth: a sized WebP thumbnail falls back to original extensions", iconList.get(0).equals("https://cdn.modrinth.com/data/AANobbMI/295862f4.png") && iconList.size() == 6);
+        java.util.List<String> queryIconList = Modrinth.iconCandidates("https://cdn.modrinth.com/data/id/icon_64.webp?key=value");
+        check("modrinth: thumbnail URL query does not block original icon fallback", queryIconList.get(0).equals("https://cdn.modrinth.com/data/id/icon.png?key=value"));
         check("modrinth: a normal icon address is used as it is", Modrinth.iconCandidates("https://cdn/x.png").equals(java.util.List.of("https://cdn/x.png")));
         check("modrinth: download counts are short", ModrinthDialog.count(123456789L).equals("123.5M") && ModrinthDialog.count(1500).equals("1.5K") && ModrinthDialog.count(12).equals("12"));
         String versions = "[{\"id\":\"v3\",\"project_id\":\"P1\",\"name\":\"Beta 3\",\"version_type\":\"beta\",\"files\":[{\"filename\":\"mod-3.jar\",\"url\":\"https://cdn/mod-3.jar\",\"primary\":true,\"hashes\":{\"sha512\":\"b3\"}}],\"dependencies\":[]},"
@@ -369,6 +374,19 @@ public final class SelfTest {
                 }
             }
             check("embedded client: Minecraft 26.1 resource contains Fabric metadata", valid26Jar);
+            boolean allEmbeddedJarsValid = true;
+            for (String version : embedded.minecraftVersions()) {
+                try (java.io.InputStream in = embedded.jar(version); java.util.jar.JarInputStream jar = new java.util.jar.JarInputStream(in)) {
+                    boolean hasMetadata = false;
+                    java.util.jar.JarEntry entry;
+                    while ((entry = jar.getNextJarEntry()) != null) {
+                        if (entry.getName().equals("fabric.mod.json")) { hasMetadata = true; break; }
+                    }
+                    allEmbeddedJarsValid &= hasMetadata;
+                } catch (Exception e) { allEmbeddedJarsValid = false; }
+            }
+            check("embedded client: every indexed Minecraft version has a valid Fabric jar", allEmbeddedJarsValid
+                    && embedded.minecraftVersions().size() == 35);
             Path embeddedMods = tmp.resolve("embedded-mods");
             java.nio.file.Files.createDirectories(embeddedMods);
             try {

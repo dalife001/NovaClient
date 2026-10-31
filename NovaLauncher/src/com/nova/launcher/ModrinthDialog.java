@@ -50,7 +50,12 @@ final class ModrinthDialog extends JDialog {
         this.versionDir = versionDir;
         this.mc = mc;
         Path home;
-        try { home = versionDir.toAbsolutePath().getParent().getParent().getParent().getParent(); } catch (Exception e) { home = Path.of(System.getProperty("java.io.tmpdir")); }
+        try {
+            Path versionsDir = versionDir.toAbsolutePath().normalize().getParent();
+            Path gameDir = versionsDir != null && "versions".equalsIgnoreCase(String.valueOf(versionsDir.getFileName()))
+                    ? versionsDir.getParent() : null;
+            home = gameDir != null && gameDir.getParent() != null ? gameDir.getParent() : Path.of(System.getProperty("java.io.tmpdir"));
+        } catch (Exception e) { home = Path.of(System.getProperty("java.io.tmpdir")); }
         this.cacheDir = home.resolve("icon-cache");
 
         // ---- top: title, tabs, search
@@ -223,7 +228,11 @@ final class ModrinthDialog extends JDialog {
     private BufferedImage fetchIcon(Modrinth.Hit h) {
         Path cached = cacheDir.resolve(h.id() + ".png");
         try {
-            if (Files.isRegularFile(cached)) { BufferedImage c = ImageIO.read(cached.toFile()); if (c != null) return c; }
+            if (Files.isRegularFile(cached)) {
+                BufferedImage c = ImageIO.read(cached.toFile());
+                if (c != null) return c;
+                Files.deleteIfExists(cached);
+            }
         } catch (Exception ignored) {}
         for (String url : Modrinth.iconCandidates(h.iconUrl())) {
             try {

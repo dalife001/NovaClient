@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "novaclient",
-  "version": "0.7.4",
+  "version": "0.7.0",
   "name": "Nova Client",
   "description": "Custom Minecraft client: main menu, accounts, skins, friends, HUD modules, zoom and more. Sodium, Iris and Freecam are optional and chosen in the Nova Launcher.",
   "environment": "client",
@@ -9,7 +9,7 @@
   "mixins": ["novaclient.mixins.json"],
   "depends": {
     "fabricloader": ">=0.16.0",
-    "minecraft": "26.3",
+    "minecraft": "26.1",
     "java": ">=25",
     "fabric-api": "*"
   }

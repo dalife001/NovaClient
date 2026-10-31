@@ -48,7 +48,9 @@ final class Orbit extends JComponent {
     private static final int STARS = 150;
     private final float[] sx = new float[STARS], sy = new float[STARS], sp = new float[STARS];
     private final int[] edge = new int[20];
-    private int[] skinPx = SkinRenderer.front(defaultSkin(), false);
+    private BufferedImage skinImage = defaultSkin();
+    private boolean skinSlim;
+    private int[] skinPx = SkinRenderer.front(skinImage, false);
     private double planetX, planetY, planetR;      // in scene cells
     private int islandX, islandTop;                 // in scene cells
     private final long t0 = System.nanoTime();
@@ -110,7 +112,9 @@ final class Orbit extends JComponent {
 
     // ------------------------------------------------------------------ API
     void setSkin(java.awt.image.BufferedImage skin, boolean slim) {
-        skinPx = SkinRenderer.front(skin == null ? defaultSkin() : skin, slim);
+        skinImage = skin == null ? defaultSkin() : skin;
+        skinSlim = slim;
+        skinPx = SkinRenderer.front(skinImage, slim);
     }
 
     void showSidePanel(JComponent panel) {
@@ -272,15 +276,20 @@ final class Orbit extends JComponent {
         rect(cx, ty - 5, 2, 5, lerp(cr, deep, 0.25f), 1f);
         rect(cx, ty - 7, 1, 2, lerp(cr, 0xFFFFFF, 0.5f), 1f);
         disc(cx + 1, ty - 3, 6, cr, 0.07f);
-        // shadow + character (every skin pixel is 2x2 cells)
+        // shadow + full-resolution skin sprite, scaled proportionally into the scene.
         for (int x = icx - 13; x <= icx + 13; x++) { put(x, ty, 0x000000, 0.30f); if (Math.abs(x - icx) < 10) put(x, ty + 1, 0x000000, 0.14f); }
-        int ox = icx - 16, oy = ty - 64;
-        for (int py = 0; py < 32; py++)
-            for (int pxl = 0; pxl < 16; pxl++) {
-                int a = skinPx[py * 16 + pxl];
+        BufferedImage skin = SkinRenderer.toImage(skinPx, 1);
+        int targetHeight = 72;
+        int targetWidth = Math.max(1, Math.round(targetHeight * SkinRenderer.W / (float) SkinRenderer.H));
+        int ox = icx - targetWidth / 2, oy = ty - targetHeight;
+        for (int py = 0; py < targetHeight; py++)
+            for (int pxl = 0; pxl < targetWidth; pxl++) {
+                int sx = Math.min(SkinRenderer.W - 1, pxl * SkinRenderer.W / targetWidth);
+                int sy = Math.min(SkinRenderer.H - 1, py * SkinRenderer.H / targetHeight);
+                int a = skin.getRGB(sx, sy);
                 if ((a >>> 24) < 128) continue;
-                int c = lerp(a & 0xFFFFFF, top, 0.10f * pxl / 16f);
-                rect(ox + pxl * 2, oy + py * 2, 2, 2, c, 1f);
+                int c = lerp(a & 0xFFFFFF, top, 0.10f * pxl / targetWidth);
+                put(ox + pxl, oy + py, c, 1f);
             }
     }
 
